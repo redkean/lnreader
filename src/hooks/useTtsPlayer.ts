@@ -1,0 +1,346 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  getNextChapter,
+  getPrevChapter,
+  markChapterRead,
+  updateChapterProgress,
+} from '@database/queries/ChapterQueries';
+import { ChapterInfo, NovelInfo } from '@database/types';
+import { useChapterReaderSettings } from '@hooks/persisted';
+import { keyContract } from '@hooks/persisted/useNovel/store-helper/keyContract';
+import { defaultNovelSettings } from '@hooks/persisted/useNovel/types';
+import NativeFile from '@modules/native-file';
+import {
+  Tts,
+  TtsPlaybackState,
+  TtsProgress,
+  TtsSession,
+  TtsSettings,
+} from '@modules/nitro-tts';
+import { sanitizeChapterText } from '@screens/reader/utils/sanitizeChapterText';
+import { extractTtsParagraphs } from '@screens/reader/utils/ttsParagraphs';
+import { toNativeTtsSettings } from '@screens/reader/utils/ttsSettings';
+import { fetchChapter } from '@services/plugin/fetch';
+import { getMMKVObject } from '@utils/mmkv/mmkv';
+import { NOVEL_STORAGE } from '@utils/Storages';
+
+const EMPTY_PROGRESS: TtsProgress = { index: 0, total: 0, paragraphId: '' };
+
+/** Start fetching the next chapter once the queue is this far along. */
+const PREFETCH_THRESHOLD = 0.8;
+
+export interface TtsPlayerTrack {
+  novel: NovelInfo;
+  chapter: ChapterInfo;
+}
+
+const excludedScanlatorsFor = (novel: NovelInfo): string[] =>
+  getMMKVObject<{ excludedScanlators?: string[] }>(
+    keyContract.settings({ pluginId: novel.pluginId, novelPath: novel.path }),
+  )?.excludedScanlators ??
+  defaultNovelSettings.excludedScanlators ??
+  [];
+
+/**
+ * Owns the app-wide TTS queue.
+ *
+ * The reader cannot own it: its WebView stops being laid out once the screen
+ * turns off, so `innerText` yields nothing and the queue for the next chapter
+ * comes back empty. Paragraphs are parsed from chapter HTML here instead, on
+ * the JS thread that the playback foreground service keeps alive, so a chapter
+ * boundary is crossed with the screen off.
+ */
+export const useTtsPlayer = () => {
+  const readerSettings = useChapterReaderSettings();
+
+  const sessionRef = useRef<TtsSession | null>(null);
+  const sessionPromiseRef = useRef<Promise<TtsSession> | null>(null);
+  const subscriptionsRef = useRef<{ remove(): void }[]>([]);
+  const queueCacheRef = useRef(new Map<number, Promise<string[]>>());
+  const trackRef = useRef<TtsPlayerTrack | null>(null);
+  const advancingRef = useRef(false);
+  const prefetchedForRef = useRef<number | null>(null);
+
+  const [track, setTrack] = useState<TtsPlayerTrack | null>(null);
+  const [paragraphs, setParagraphs] = useState<string[]>([]);
+  const [state, setState] = useState<TtsPlaybackState>('idle');
+  const [progress, setProgress] = useState<TtsProgress>(EMPTY_PROGRESS);
+  const [error, setError] = useState<string | null>(null);
+  const [sleepTimerEndsAt, setSleepTimerEndsAt] = useState<number | null>(null);
+
+  const settingsRef = useRef(readerSettings);
+  useEffect(() => {
+    settingsRef.current = readerSettings;
+  }, [readerSettings]);
+
+  const ensureSession = useCallback(async () => {
+    if (sessionRef.current) {
+      return sessionRef.current;
+    }
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = Tts.createSession()
+        .then(session => {
+          sessionRef.current = session;
+          subscriptionsRef.current = [
+            session.addOnStateChangedListener(setState),
+            session.addOnProgressChangedListener(setProgress),
+            session.addOnErrorListener(setError),
+          ];
+          return session;
+        })
+        .catch(cause => {
+          sessionPromiseRef.current = null;
+          throw cause;
+        });
+    }
+    return sessionPromiseRef.current;
+  }, []);
+
+  const loadChapterParagraphs = useCallback(
+    (novel: NovelInfo, chapter: ChapterInfo): Promise<string[]> => {
+      const cached = queueCacheRef.current.get(chapter.id);
+      if (cached) {
+        return cached;
+      }
+
+      const pending = (async () => {
+        const filePath = `${NOVEL_STORAGE}/${novel.pluginId}/${chapter.novelId}/${chapter.id}/index.html`;
+        let text: string;
+        try {
+          text = await NativeFile.readFile(filePath);
+        } catch {
+          text = await fetchChapter(novel.pluginId, chapter.path);
+        }
+        return extractTtsParagraphs(
+          sanitizeChapterText(novel.pluginId, novel.name, chapter.name, text),
+        );
+      })();
+
+      queueCacheRef.current.set(chapter.id, pending);
+      pending.catch(() => queueCacheRef.current.delete(chapter.id));
+
+      return pending;
+    },
+    [],
+  );
+
+  const resolveAdjacent = useCallback(
+    async (
+      current: TtsPlayerTrack,
+      direction: 'NEXT' | 'PREV',
+    ): Promise<ChapterInfo | undefined> => {
+      const { chapter, novel } = current;
+      const query = direction === 'NEXT' ? getNextChapter : getPrevChapter;
+      return query(
+        chapter.novelId,
+        chapter.position ?? 0,
+        chapter.page ?? '',
+        excludedScanlatorsFor(novel),
+      );
+    },
+    [],
+  );
+
+  const playChapter = useCallback(
+    async (novel: NovelInfo, chapter: ChapterInfo, startIndex = 0) => {
+      setError(null);
+      const next: TtsPlayerTrack = { novel, chapter };
+      trackRef.current = next;
+      prefetchedForRef.current = null;
+      setTrack(next);
+
+      try {
+        const queue = await loadChapterParagraphs(novel, chapter);
+        if (trackRef.current?.chapter.id !== chapter.id) {
+          return;
+        }
+        if (queue.length === 0) {
+          setError('No readable paragraphs were found in this chapter.');
+          return;
+        }
+
+        setParagraphs(queue);
+
+        const session = await ensureSession();
+        await session.load(
+          queue.map((text, index) => ({ id: String(index), text })),
+          Math.min(Math.max(startIndex, 0), queue.length - 1),
+          {
+            novelName: novel.name,
+            chapterName: chapter.name,
+            coverUri: novel.cover || undefined,
+          },
+          toNativeTtsSettings(settingsRef.current.tts),
+        );
+        await session.play();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    },
+    [ensureSession, loadChapterParagraphs],
+  );
+
+  const skipChapter = useCallback(
+    async (direction: 'NEXT' | 'PREV') => {
+      const current = trackRef.current;
+      if (!current) {
+        return false;
+      }
+      const adjacent = await resolveAdjacent(current, direction);
+      if (!adjacent) {
+        return false;
+      }
+      await playChapter(current.novel, adjacent);
+      return true;
+    },
+    [playChapter, resolveAdjacent],
+  );
+
+  const run = useCallback(
+    (operation: (session: TtsSession) => Promise<void>) => {
+      void (async () => {
+        try {
+          await operation(await ensureSession());
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      })();
+    },
+    [ensureSession],
+  );
+
+  const stop = useCallback(() => {
+    trackRef.current = null;
+    setTrack(null);
+    setParagraphs([]);
+    setProgress(EMPTY_PROGRESS);
+    setSleepTimerEndsAt(null);
+    run(session => session.stop());
+  }, [run]);
+
+  // Crossing a chapter boundary is the whole point of the player, so it is
+  // driven by native completion rather than by anything in the reader.
+  useEffect(() => {
+    if (state !== 'completed' || advancingRef.current) {
+      return;
+    }
+    const current = trackRef.current;
+    if (!current) {
+      return;
+    }
+
+    advancingRef.current = true;
+    void (async () => {
+      try {
+        await markChapterRead(current.chapter.id);
+        const advanced = await skipChapter('NEXT');
+        if (!advanced) {
+          stop();
+        }
+      } finally {
+        advancingRef.current = false;
+      }
+    })();
+  }, [state, skipChapter, stop]);
+
+  // Keep the next chapter warm so the boundary costs no network round trip.
+  useEffect(() => {
+    const current = trackRef.current;
+    if (!current || progress.total === 0) {
+      return;
+    }
+    if (prefetchedForRef.current === current.chapter.id) {
+      return;
+    }
+    if ((progress.index + 1) / progress.total < PREFETCH_THRESHOLD) {
+      return;
+    }
+
+    prefetchedForRef.current = current.chapter.id;
+    void (async () => {
+      const upcoming = await resolveAdjacent(current, 'NEXT');
+      if (upcoming) {
+        loadChapterParagraphs(current.novel, upcoming).catch(() => {});
+      }
+    })();
+  }, [progress, loadChapterParagraphs, resolveAdjacent]);
+
+  useEffect(() => {
+    const current = trackRef.current;
+    if (!current || progress.total === 0) {
+      return;
+    }
+    void updateChapterProgress(
+      current.chapter.id,
+      Math.round(((progress.index + 1) / progress.total) * 100),
+    );
+  }, [progress]);
+
+  useEffect(() => {
+    if (sleepTimerEndsAt === null) {
+      return;
+    }
+    const remaining = sleepTimerEndsAt - Date.now();
+    const timer = setTimeout(() => {
+      setSleepTimerEndsAt(null);
+      run(session => session.pause());
+    }, Math.max(remaining, 0));
+
+    return () => clearTimeout(timer);
+  }, [sleepTimerEndsAt, run]);
+
+  useEffect(() => {
+    const subscriptions = subscriptionsRef.current;
+    return () => {
+      subscriptions.forEach(subscription => subscription.remove());
+      subscriptionsRef.current = [];
+    };
+  }, []);
+
+  return useMemo(
+    () => ({
+      error,
+      isActive: track !== null,
+      novel: track?.novel,
+      chapter: track?.chapter,
+      paragraphs,
+      progress,
+      sleepTimerEndsAt,
+      state,
+      pause: () => run(session => session.pause()),
+      play: () => run(session => session.play()),
+      playChapter,
+      replay: () => run(session => session.replayCurrent()),
+      seekTo: (index: number) => run(session => session.seekTo(index)),
+      setSleepTimer: (minutes: number | null) =>
+        setSleepTimerEndsAt(
+          minutes === null ? null : Date.now() + minutes * 60_000,
+        ),
+      skipChapter,
+      skipNext: () => run(session => session.skipNext()),
+      skipPrevious: () => run(session => session.skipPrevious()),
+      stop,
+      updateSettings: (settings?: TtsSettings) =>
+        run(session =>
+          session.updateSettings(
+            settings ?? toNativeTtsSettings(settingsRef.current.tts),
+          ),
+        ),
+    }),
+    [
+      error,
+      paragraphs,
+      playChapter,
+      progress,
+      run,
+      skipChapter,
+      sleepTimerEndsAt,
+      state,
+      stop,
+      track,
+    ],
+  );
+};
+
+export type TtsPlayerApi = ReturnType<typeof useTtsPlayer>;

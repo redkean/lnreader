@@ -1,4 +1,11 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   NativeEventEmitter,
   NativeModules,
@@ -26,7 +33,7 @@ import { getBatteryLevel } from 'react-native-device-info';
 import { PLUGIN_STORAGE } from '@utils/Storages';
 import { useChapterContext } from '../ChapterContext';
 import { ReaderSearchResult } from '../types';
-import { useTtsSession } from '../hooks/useTtsSession';
+import { useTtsPlayerContext } from '@components/Context/TtsPlayerContext';
 import type { TtsSettings } from '@modules/nitro-tts';
 import { ChapterInfo } from '@database/types';
 import { Dialog } from '@components/Dialog';
@@ -171,13 +178,51 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   const activeChapterIdRef = useRef(chapter.id);
   const adjacentChapterScriptRef = useRef(buildAdjacentChapterScript());
   const {
-    command: runTtsCommand,
-    loadAndPlay,
+    chapter: playerChapter,
+    pause: pauseTts,
+    play: playTts,
+    playChapter,
     progress: ttsProgress,
+    replay: replayTts,
     seekTo: seekTts,
+    skipNext: skipTtsNext,
+    skipPrevious: skipTtsPrevious,
     state: ttsState,
+    stop: stopTts,
     updateSettings: updateTtsSettings,
-  } = useTtsSession();
+  } = useTtsPlayerContext();
+
+  const runTtsCommand = useCallback(
+    (
+      ttsCommand: 'next' | 'pause' | 'play' | 'previous' | 'replay' | 'stop',
+    ) => {
+      switch (ttsCommand) {
+        case 'next':
+          return skipTtsNext();
+        case 'pause':
+          return pauseTts();
+        case 'play':
+          return playTts();
+        case 'previous':
+          return skipTtsPrevious();
+        case 'replay':
+          return replayTts();
+        case 'stop':
+          return stopTts();
+      }
+    },
+    [pauseTts, playTts, replayTts, skipTtsNext, skipTtsPrevious, stopTts],
+  );
+
+  const playerChapterIdRef = useRef(playerChapter?.id);
+  useEffect(() => {
+    playerChapterIdRef.current = playerChapter?.id;
+  }, [playerChapter?.id]);
+
+  const ttsProgressRef = useRef(ttsProgress);
+  useEffect(() => {
+    ttsProgressRef.current = ttsProgress;
+  }, [ttsProgress]);
 
   const { customJS, customCSS } = useCustomCode(initialReaderSettings);
 
@@ -211,9 +256,6 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
       window.tts?.setPlaybackState?.(${JSON.stringify(ttsState)});
       true;
     `);
-    if (ttsState === 'completed') {
-      webViewRef.current?.injectJavaScript('window.tts?.complete?.(); true;');
-    }
   }, [isTTSReadingRef, ttsState, webViewRef]);
 
   useEffect(() => {
@@ -228,7 +270,9 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   useEffect(() => {
     if (activeChapterIdRef.current !== chapter.id) {
       activeChapterIdRef.current = chapter.id;
-      runTtsCommand('stop');
+      if (playerChapterIdRef.current !== chapter.id) {
+        runTtsCommand('stop');
+      }
     }
   }, [chapter.id, runTtsCommand]);
 
@@ -434,8 +478,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
     chapter,
     chapterGeneralSettings,
     processedHtml,
-      customJS,
-      customCSS,
+    customJS,
+    customCSS,
     initialReaderSettings,
     novel,
     plugin,
@@ -446,31 +490,31 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   ]);
 
   return (
-      <>
-    <WebView
-      ref={webViewRef}
-      onTouchStart={onTouchStart}
-      style={{ backgroundColor: readerSettings.theme }}
-      allowFileAccess={true}
-      originWhitelist={['*']}
-      scalesPageToFit={true}
-      showsVerticalScrollIndicator={false}
-      javaScriptEnabled={true}
-      webviewDebuggingEnabled={__DEV__}
-      onShouldStartLoadWithRequest={({ url }) => {
-        if (isPluginIssueReportUrl(url)) {
-          void Linking.openURL(url);
-          return false;
-        }
-        if (isChapterRefreshUrl(url)) {
-          refetch();
-          return false;
-        }
-        return true;
-      }}
-      onLoadEnd={() => {
-        webViewRef.current?.injectJavaScript(
-          `if (window.reader && window.reader.batteryLevel) {
+    <>
+      <WebView
+        ref={webViewRef}
+        onTouchStart={onTouchStart}
+        style={{ backgroundColor: readerSettings.theme }}
+        allowFileAccess={true}
+        originWhitelist={['*']}
+        scalesPageToFit={true}
+        showsVerticalScrollIndicator={false}
+        javaScriptEnabled={true}
+        webviewDebuggingEnabled={__DEV__}
+        onShouldStartLoadWithRequest={({ url }) => {
+          if (isPluginIssueReportUrl(url)) {
+            void Linking.openURL(url);
+            return false;
+          }
+          if (isChapterRefreshUrl(url)) {
+            refetch();
+            return false;
+          }
+          return true;
+        }}
+        onLoadEnd={() => {
+          webViewRef.current?.injectJavaScript(
+            `if (window.reader && window.reader.batteryLevel) {
             window.reader.batteryLevel.val = ${lastKnownBatteryLevel};
           }`,
           );
@@ -487,19 +531,23 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
             );
           }
 
-          if (autoStartTTSRef.current) {
+          // The player may have started this chapter while the screen was
+          // off, in which case this page has a queue to highlight but must not
+          // post one back.
+          if (playerChapterIdRef.current === chapter.id) {
             autoStartTTSRef.current = false;
-            setTimeout(() => {
-              webViewRef.current?.injectJavaScript(`
+            webViewRef.current?.injectJavaScript(
+              `window.tts?.hydrate?.(${ttsProgressRef.current.index}); true;`,
+            );
+          } else if (autoStartTTSRef.current) {
+            autoStartTTSRef.current = false;
+            webViewRef.current?.injectJavaScript(`
               (function() {
                 if (window.tts && reader.generalSettings.val.TTSEnable) {
-                  setTimeout(() => {
-                    tts.start();
-                  }, 500);
+                  tts.start();
                 }
               })();
             `);
-            }, 300);
           }
         }}
         onMessage={(ev: { nativeEvent: { data: string } }) => {
@@ -520,16 +568,9 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                 typeof payload?.startIndex === 'number'
                   ? payload.startIndex
                   : 0;
-              void loadAndPlay(
-                queue,
-                startIndex,
-                {
-                  novelName: novel?.name || 'Unknown',
-                  chapterName: chapter.name,
-                  coverUri: novel?.cover || undefined,
-                },
-                toNativeTtsSettings(readerSettingsRef.current.tts),
-              );
+              if (novel && queue.length > 0) {
+                void playChapter(novel, chapter, startIndex);
+              }
               break;
             }
             case 'tts-command': {

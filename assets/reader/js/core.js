@@ -306,9 +306,7 @@ window.tts = new (function () {
     reader.post({ type: 'tts-command', data: { command: 'previous' } });
   };
 
-  this.start = element => {
-    const startElement = element ?? reader.chapterElement;
-
+  this.collect = () => {
     const readableEntries = this.getAllReadableElements(reader.chapterElement)
       .map(readableElement => ({
         element: readableElement,
@@ -318,6 +316,22 @@ window.tts = new (function () {
     this.allReadableElements = readableEntries.map(entry => entry.element);
     this.totalElements = this.allReadableElements.length;
     this.textQueue = readableEntries.map(entry => entry.text);
+  };
+
+  // Re-attaches highlighting to a queue native playback already owns, without
+  // posting a queue back: the player may have started this chapter while the
+  // screen was off and this page never rendered.
+  this.hydrate = index => {
+    this.collect();
+    if (this.totalElements === 0) return;
+    this.started = true;
+    this.setActiveIndex(typeof index === 'number' ? index : 0);
+  };
+
+  this.start = element => {
+    const startElement = element ?? reader.chapterElement;
+
+    this.collect();
 
     const requestedIndex =
       element && element !== reader.chapterElement

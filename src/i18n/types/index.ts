@@ -728,4 +728,19 @@ export interface StringMap {
   'genreStats.normalizationValuePlaceholder': 'string';
   'genreStats.noCategories': 'string';
   'genreStats.noNormalization': 'string';
+  'ttsPlayer.title': 'string';
+  'ttsPlayer.listen': 'string';
+  'ttsPlayer.nothingPlaying': 'string';
+  'ttsPlayer.play': 'string';
+  'ttsPlayer.pause': 'string';
+  'ttsPlayer.stop': 'string';
+  'ttsPlayer.replayParagraph': 'string';
+  'ttsPlayer.previousParagraph': 'string';
+  'ttsPlayer.nextParagraph': 'string';
+  'ttsPlayer.previousChapter': 'string';
+  'ttsPlayer.nextChapter': 'string';
+  'ttsPlayer.sleepTimer': 'string';
+  'ttsPlayer.sleepTimerOff': 'string';
+  'ttsPlayer.minutes': 'string';
+  'ttsPlayer.sleepingIn': 'string';
 }

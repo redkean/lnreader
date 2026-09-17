@@ -42,6 +42,8 @@ import ShareIntentHandler, {
 } from './ShareIntentHandler';
 import { LibraryContextProvider } from '@components/Context/LibraryContext';
 import { UpdateContextProvider } from '@components/Context/UpdateContext';
+import { TtsPlayerContextProvider } from '@components/Context/TtsPlayerContext';
+import TtsPlayerScreen from '@screens/ttsPlayer/TtsPlayerScreen';
 import { useReactNavigationDevTools } from '@rozenite/react-navigation-plugin';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -114,34 +116,43 @@ const MainNavigator = () => {
       <ShareIntentHandler />
       <LibraryContextProvider>
         <UpdateContextProvider>
-          <AppUpdateChecker />
-          <Stack.Navigator
-            screenOptions={{
-              animation: 'none',
-              contentStyle: { backgroundColor: theme.background },
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="BottomNavigator" component={BottomNavigator} />
-            <Stack.Screen name="ReaderStack" component={ReaderStack} />
-            <Stack.Screen name="MoreStack" component={MoreStack} />
-            <Stack.Screen name="SourceScreen" component={BrowseSourceScreen} />
-            <Stack.Screen name="BrowseMal" component={MalTopNovels} />
-            <Stack.Screen name="BrowseAL" component={AniListTopNovels} />
-            <Stack.Screen name="BrowseSettings" component={BrowseSettings} />
-            <Stack.Screen
-              name="PluginDetails"
-              component={PluginDetailsScreen}
-            />
-            <Stack.Screen
-              name="GlobalSearchScreen"
-              component={GlobalSearchScreen}
-            />
-            <Stack.Screen name="Migration" component={Migration} />
-            <Stack.Screen name="SourceNovels" component={SourceNovels} />
-            <Stack.Screen name="MigrateNovel" component={MigrateNovel} />
-            <Stack.Screen name="WebviewScreen" component={WebviewScreen} />
-          </Stack.Navigator>
+          <TtsPlayerContextProvider>
+            <AppUpdateChecker />
+            <Stack.Navigator
+              screenOptions={{
+                animation: 'none',
+                contentStyle: { backgroundColor: theme.background },
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen
+                name="BottomNavigator"
+                component={BottomNavigator}
+              />
+              <Stack.Screen name="ReaderStack" component={ReaderStack} />
+              <Stack.Screen name="MoreStack" component={MoreStack} />
+              <Stack.Screen
+                name="SourceScreen"
+                component={BrowseSourceScreen}
+              />
+              <Stack.Screen name="BrowseMal" component={MalTopNovels} />
+              <Stack.Screen name="BrowseAL" component={AniListTopNovels} />
+              <Stack.Screen name="BrowseSettings" component={BrowseSettings} />
+              <Stack.Screen
+                name="PluginDetails"
+                component={PluginDetailsScreen}
+              />
+              <Stack.Screen
+                name="GlobalSearchScreen"
+                component={GlobalSearchScreen}
+              />
+              <Stack.Screen name="Migration" component={Migration} />
+              <Stack.Screen name="TtsPlayer" component={TtsPlayerScreen} />
+              <Stack.Screen name="SourceNovels" component={SourceNovels} />
+              <Stack.Screen name="MigrateNovel" component={MigrateNovel} />
+              <Stack.Screen name="WebviewScreen" component={WebviewScreen} />
+            </Stack.Navigator>
+          </TtsPlayerContextProvider>
         </UpdateContextProvider>
       </LibraryContextProvider>
     </NavigationContainer>

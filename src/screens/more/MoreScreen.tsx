@@ -13,9 +13,11 @@ import {
   BACKGROUND_TASKS_STORE_KEY,
   QueuedBackgroundTask,
 } from '@services/backgroundTasks';
+import { useTtsPlayerContext } from '@components/Context/TtsPlayerContext';
 
 const MoreScreen = ({ navigation }: MoreStackScreenProps) => {
   const theme = useTheme();
+  const ttsPlayer = useTtsPlayerContext();
   const [taskQueue] = useMMKVObject<QueuedBackgroundTask[]>(
     BACKGROUND_TASKS_STORE_KEY,
   );
@@ -122,6 +124,13 @@ const MoreScreen = ({ navigation }: MoreStackScreenProps) => {
             <Switch value={incognitoMode} onValueChange={enableIncognitoMode} />
           </Pressable>
           <List.Divider theme={theme} />
+          <List.Item
+            title={getString('ttsPlayer.title')}
+            description={ttsPlayer.isActive ? ttsPlayer.chapter?.name : ''}
+            icon="headphones"
+            onPress={() => navigation.navigate('TtsPlayer')}
+            theme={theme}
+          />
           <List.Item
             title={'Task Queue'}
             description={

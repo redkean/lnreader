@@ -867,5 +867,22 @@
     "normalizationValuePlaceholder": "e.g. Sci-Fi",
     "noCategories": "No parent categories configured",
     "noNormalization": "No normalization rules configured"
+  },
+  "ttsPlayer": {
+    "title": "Player",
+    "listen": "Listen",
+    "nothingPlaying": "Nothing is playing. Start text-to-speech from a chapter to listen on the go.",
+    "play": "Play",
+    "pause": "Pause",
+    "stop": "Stop",
+    "replayParagraph": "Replay paragraph",
+    "previousParagraph": "Previous paragraph",
+    "nextParagraph": "Next paragraph",
+    "previousChapter": "Previous chapter",
+    "nextChapter": "Next chapter",
+    "sleepTimer": "Sleep timer",
+    "sleepTimerOff": "Off",
+    "minutes": "%{minutes} min",
+    "sleepingIn": "Sleeping in %{time}"
   }
 }

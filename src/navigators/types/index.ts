@@ -22,6 +22,7 @@ export type RootStackParamList = {
   PluginDetails: { pluginId: string };
   GlobalSearchScreen: { searchText?: string };
   Migration: undefined;
+  TtsPlayer: undefined;
   SourceNovels: { pluginId: string };
   MigrateNovel: { novel: NovelInfo };
   WebviewScreen: {
@@ -31,6 +32,11 @@ export type RootStackParamList = {
     isNovel?: boolean;
   };
 };
+
+export type TtsPlayerScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'TtsPlayer'
+>;
 
 export type BottomNavigatorParamList = {
   Library: undefined;
