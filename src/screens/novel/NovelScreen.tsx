@@ -29,6 +29,9 @@ import { useNovelRefresh } from './hooks/useNovelRefresh';
 import SetCategoryModal from './components/SetCategoriesModal';
 import { backgroundTasks } from '@services/backgroundTasks';
 import { getPageChapterIds } from '@database/queries/ChapterQueries';
+import { useAISettings } from '@hooks/persisted/useAISettings';
+import AIJobDialog from './components/AIJobDialog';
+import type { ChapterInfo } from '@database/types';
 
 const Novel = ({ route, navigation }: NovelScreenProps) => {
   const novel = useNovelValue('novel');
@@ -85,6 +88,9 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     setFalse: closeDlChapterModal,
   } = useBoolean();
 
+  const aiEnabled = useAISettings().enabled;
+  const [aiJobChapters, setAiJobChapters] = useState<ChapterInfo[]>();
+
   const {
     deleteDownloadedChapters,
     downloadAvailableChapters,
@@ -97,6 +103,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     novel,
     selectedIds: selected,
     selectedChapters,
+    onProcessWithAI: aiEnabled ? setAiJobChapters : undefined,
   });
 
   const setCustomNovelCover = useCustomNovelCover(novel, setNovel);
@@ -221,6 +228,14 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
             novelIds={[novel.id]}
             closeModal={closeSetCategoriesModal}
             visible
+          />
+        ) : null}
+
+        {novel && aiJobChapters?.length ? (
+          <AIJobDialog
+            novel={novel}
+            chapters={aiJobChapters}
+            onDismiss={() => setAiJobChapters(undefined)}
           />
         ) : null}
 

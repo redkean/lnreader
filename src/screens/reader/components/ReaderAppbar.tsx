@@ -52,7 +52,14 @@ const ReaderAppbar = ({
   openInBrowser,
   shareChapter,
 }: ReaderAppbarProps) => {
-  const { chapter, novel, refetch } = useChapterContext();
+  const {
+    chapter,
+    novel,
+    refetch,
+    aiHasCleaned,
+    aiShowCleaned,
+    toggleAICleaned,
+  } = useChapterContext();
   const { statusBarHeight } = useNovelLayout();
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -134,6 +141,21 @@ const ReaderAppbar = ({
             {chapter.name}
           </Text>
         </View>
+        {aiHasCleaned ? (
+          <IconButtonV2
+            accessibilityLabel={
+              aiShowCleaned
+                ? getString('aiSettings.showOriginal')
+                : getString('aiSettings.showCleaned')
+            }
+            name={aiShowCleaned ? 'auto-fix' : 'format-text'}
+            size={24}
+            padding={12}
+            onPress={toggleAICleaned}
+            color={aiShowCleaned ? theme.primary : theme.onSurface}
+            theme={theme}
+          />
+        ) : null}
         <IconButtonV2
           name={searchVisible ? 'close' : 'magnify'}
           size={24}

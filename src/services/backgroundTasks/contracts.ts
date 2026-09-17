@@ -6,6 +6,7 @@ import type {
   EpubExportMetadata,
 } from '@modules/nitro-epub';
 import type { BackupOptions } from '@services/backup/options';
+import type { AIProcessChaptersData } from '@services/ai/processChapters';
 
 export type SelfHostData = {
   host: string;
@@ -78,6 +79,7 @@ export type BackgroundTask =
     }
   | { name: 'LOCAL_RESTORE'; data: { sourceUri: string } }
   | { name: 'MIGRATE_NOVEL'; data: MigrateNovelData }
+  | { name: 'AI_PROCESS_CHAPTERS'; data: AIProcessChaptersData }
   | DownloadChapterTask;
 
 export type DownloadChapterTask = {

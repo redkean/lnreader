@@ -18,6 +18,8 @@ import RespositorySettings from '@screens/settings/SettingsRepositoryScreen/Sett
 import LibrarySettings from '@screens/settings/SettingsLibraryScreen/SettingsLibraryScreen';
 import StatsScreen from '@screens/StatsScreen/StatsScreen';
 import GenreTaxonomyScreen from '@screens/settings/SettingsTaxonomyScreen/SettingsTaxonomyScreen';
+import AISettings from '@screens/settings/SettingsAIScreen/SettingsAIScreen';
+import GlossaryScreen from '@screens/GlossaryScreen/GlossaryScreen';
 import { MoreStackParamList, SettingsStackParamList } from './types';
 import { useTheme } from '@hooks/persisted';
 
@@ -48,9 +50,10 @@ const SettingsStack = () => {
         component={RespositorySettings}
       />
       <Stack.Screen name="LibrarySettings" component={LibrarySettings} />
-<Stack.Screen name="CustomCode" component={SettingsCustomCode} />
+      <Stack.Screen name="CustomCode" component={SettingsCustomCode} />
       <Stack.Screen name="CodeSnippets" component={CodeSnippetsScreen} />
       <Stack.Screen name="GenreTaxonomy" component={GenreTaxonomyScreen} />
+      <Stack.Screen name="AISettings" component={AISettings} />
     </Stack.Navigator>
   );
 };
@@ -72,6 +75,7 @@ const MoreStack = () => {
       <Stack.Screen name="Downloads" component={Downloads} />
       <Stack.Screen name="Categories" component={CategoriesScreen} />
       <Stack.Screen name="Statistics" component={StatsScreen} />
+      <Stack.Screen name="Glossary" component={GlossaryScreen} />
     </Stack.Navigator>
   );
 };

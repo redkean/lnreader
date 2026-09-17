@@ -74,6 +74,17 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
           theme={theme}
         />
         <List.Item
+          title={getString('aiSettings.title')}
+          description={getString('aiSettings.description')}
+          icon="auto-fix"
+          onPress={() =>
+            navigation.navigate('SettingsStack', {
+              screen: 'AISettings',
+            })
+          }
+          theme={theme}
+        />
+        <List.Item
           title={getString('tracking')}
           icon="sync"
           onPress={() =>
