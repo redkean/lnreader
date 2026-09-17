@@ -1,0 +1,28 @@
+/*
+ * Cleaned-text highlighting. The mark is an underline rather than a filled
+ * block: a long chapter can have hundreds of edits, and block highlights over
+ * running prose are unreadable at reading font sizes.
+ */
+mark.ai-edit {
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--theme-primary),
+    transparent 45%
+  );
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Deletions have no text of their own, so they need a visible anchor. */
+mark.ai-edit:empty,
+mark.ai-edit:has(+ mark.ai-edit) {
+  text-decoration-style: solid;
+}
+
+body.ai-edits-hidden mark.ai-edit {
+  text-decoration: none;
+}

@@ -6,6 +6,7 @@ import ReaderFooter from './components/ReaderFooter';
 
 import WebViewReader from './components/WebViewReader';
 import ReaderBottomSheetV2 from './components/ReaderBottomSheet/ReaderBottomSheet';
+import AIDialogs from './components/AIDialogs';
 import ChapterDrawer from './components/ChapterDrawer';
 import ChapterLoadingScreen from './ChapterLoadingScreen/ChapterLoadingScreen';
 import { ErrorScreenV2 } from '@components';
@@ -278,6 +279,7 @@ export const ChapterContent = ({
       {readerSheetMounted ? (
         <ReaderBottomSheetV2 bottomSheetRef={readerSheetRef} />
       ) : null}
+      <AIDialogs />
       {!hidden ? (
         <>
           <ReaderAppbar

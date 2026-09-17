@@ -25,6 +25,8 @@ interface UseNovelScreenActionsOptions {
   novel?: NovelInfo;
   selectedIds: number[];
   selectedChapters: ChapterInfo[];
+  /** Opens the confirmation for a bulk AI run; absent when AI is off. */
+  onProcessWithAI?: (chapters: ChapterInfo[]) => void;
 }
 
 export const useNovelScreenActions = ({
@@ -33,6 +35,7 @@ export const useNovelScreenActions = ({
   novel,
   selectedIds,
   selectedChapters,
+  onProcessWithAI,
 }: UseNovelScreenActionsOptions) => {
   const {
     bookmarkChapters,
@@ -162,6 +165,15 @@ export const useNovelScreenActions = ({
       });
     }
 
+    if (onProcessWithAI) {
+      actions.push({
+        icon: 'auto-fix',
+        onPress: finish(() => {
+          void getChaptersByIds(selectedIds).then(onProcessWithAI);
+        }),
+      });
+    }
+
     if (selectedChapters.length === 1) {
       const selectedChapter = selectedChapters[0];
       actions.push({
@@ -187,6 +199,7 @@ export const useNovelScreenActions = ({
     markPreviousChaptersUnread,
     markPreviouschaptersRead,
     novel,
+    onProcessWithAI,
     selectedIds,
     selectedChapters,
   ]);

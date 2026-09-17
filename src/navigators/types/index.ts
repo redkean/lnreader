@@ -71,6 +71,7 @@ export type MoreStackParamList = {
   Downloads: undefined;
   Categories: undefined;
   Statistics: undefined;
+  Glossary: { novelId: number; novelName: string };
 };
 
 export type SettingsStackParamList = {
@@ -86,6 +87,7 @@ export type SettingsStackParamList = {
   CustomCode: undefined;
   CodeSnippets: { snippetIndex: number; isJS: boolean } | undefined;
   GenreTaxonomy: undefined;
+  AISettings: undefined;
 };
 
 export type NovelScreenProps = NativeStackScreenProps<
@@ -196,6 +198,15 @@ export type GenreTaxonomyScreenProps = CompositeScreenProps<
 export type RespositorySettingsScreenProps = CompositeScreenProps<
   NativeStackScreenProps<SettingsStackParamList, 'RespositorySettings'>,
   NativeStackScreenProps<RootStackParamList, 'BottomNavigator'>
+>;
+
+export type AISettingsScreenProps = NativeStackScreenProps<
+  SettingsStackParamList,
+  'AISettings'
+>;
+export type GlossaryScreenProps = NativeStackScreenProps<
+  MoreStackParamList,
+  'Glossary'
 >;
 
 export type CustomCodeSettingsScreenProps = NativeStackScreenProps<

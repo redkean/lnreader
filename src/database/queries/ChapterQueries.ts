@@ -29,6 +29,7 @@ import { ChapterFilterKey, ChapterOrderKey } from '@database/constants';
 import { chapterFilterToSQL, chapterOrderToSQL } from '@database/utils/parser';
 import { castInt } from '@database/manager/manager';
 import { createNovelTriggerQueryUpdate } from '@database/queryStrings/triggers';
+import { deleteChapterAIData } from './AIQueries';
 
 const CHAPTER_ID_BATCH_SIZE = 500;
 const chunkChapterIds = (chapterIds: number[]) =>
@@ -211,6 +212,9 @@ export const deleteChapter = async (
   chapterId: number,
 ): Promise<void> => {
   await deleteDownloadedFiles(pluginId, novelId, chapterId);
+  // The cleaned sidecar lives inside the chapter folder that was just
+  // unlinked; only its index row is left to clear.
+  await deleteChapterAIData([chapterId]);
   await dbManager.write(async tx => {
     await tx
       .update(chapterSchema)
@@ -234,6 +238,7 @@ export const deleteChapters = async (
       ids.map(chapterId => deleteDownloadedFiles(pluginId, novelId, chapterId)),
     );
   }
+  await deleteChapterAIData(chapterIds);
 
   await dbManager.write(async tx => {
     for (const ids of chunkChapterIds(chapterIds)) {

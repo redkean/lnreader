@@ -11,9 +11,11 @@ import { getNovelById } from '@database/queries/NovelQueries';
 import { dbManager } from '@database/db';
 import { chapterSchema } from '@database/schema';
 import type {
+  BackgroundTaskEnqueuer,
   BackgroundTaskExecutionContext,
   TaskProgressUpdater,
 } from '@services/backgroundTasks/contracts';
+import { getAISettings, isAIConfigured } from '@hooks/persisted/useAISettings';
 import NativeFile from '@modules/native-file';
 import { eq } from 'drizzle-orm';
 import { parseDownloadCheckpoint } from './downloadCheckpoint';
@@ -100,14 +102,20 @@ const downloadChapter = async (chapterId: number) => {
 export const downloadChapters = async (
   {
     chapters,
+    novelId,
+    novelName,
   }: {
     novelName: string;
+    novelId?: number;
     chapters: { chapterId: number; chapterName: string }[];
   },
   setMeta: TaskProgressUpdater,
   context: BackgroundTaskExecutionContext,
+  enqueue?: BackgroundTaskEnqueuer,
 ) => {
   if (!chapters.length) return;
+
+  const downloaded: { chapterId: number; chapterName: string }[] = [];
 
   const checkpoint = parseDownloadCheckpoint(
     context.checkpoint,
@@ -126,6 +134,7 @@ export const downloadChapters = async (
 
     try {
       await downloadChapter(chapter.chapterId);
+      downloaded.push(chapter);
     } catch (error) {
       failures.push(
         `${chapter.chapterName}: ${
@@ -144,6 +153,31 @@ export const downloadChapters = async (
     progress: 1,
     isRunning: false,
   }));
+
+  // The AI passes run as their own task rather than inline: they are slower
+  // than a download by an order of magnitude, and holding the download lane
+  // open for them would stall every other chapter behind this job.
+  const aiSettings = getAISettings();
+  if (
+    enqueue &&
+    novelId !== undefined &&
+    downloaded.length &&
+    aiSettings.runOnDownload &&
+    isAIConfigured(aiSettings)
+  ) {
+    enqueue({
+      name: 'AI_PROCESS_CHAPTERS',
+      data: {
+        novelId,
+        novelName,
+        chapters: downloaded,
+        passes: {
+          cleanup: aiSettings.cleanupEnabled,
+          analysis: aiSettings.summaryEnabled,
+        },
+      },
+    });
+  }
 
   if (failures.length) {
     throw new Error(

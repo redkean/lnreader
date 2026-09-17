@@ -48,6 +48,11 @@ jest.mock('@database/queries/ChapterQueries', () => ({
   insertChapters: (...args: unknown[]) => mockInsertChapters(...args),
 }));
 
+jest.mock('../useChapterAI', () => ({
+  __esModule: true,
+  default: () => ({ prefetchChapterAI: jest.fn() }),
+}));
+
 jest.mock('@database/queries/HistoryQueries', () => ({
   insertHistory: (...args: unknown[]) => mockInsertHistory(...args),
 }));

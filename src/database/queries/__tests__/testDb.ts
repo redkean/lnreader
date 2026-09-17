@@ -82,6 +82,44 @@ const MIGRATION_STATEMENTS = [
 	enabled integer DEFAULT true NOT NULL
 )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS repository_url_unique ON Repository (url)`,
+  `CREATE TABLE IF NOT EXISTS ChapterCleanup (
+	id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	chapterId integer NOT NULL,
+	novelId integer NOT NULL,
+	contentHash text NOT NULL,
+	model text NOT NULL,
+	paragraphCount integer NOT NULL,
+	changedCount integer DEFAULT 0 NOT NULL,
+	createdAt text NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS chapter_cleanup_chapter_idx ON ChapterCleanup (chapterId, contentHash)`,
+  `CREATE INDEX IF NOT EXISTS chapter_cleanup_novel_idx ON ChapterCleanup (novelId)`,
+  `CREATE TABLE IF NOT EXISTS ChapterSummary (
+	id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	chapterId integer NOT NULL,
+	novelId integer NOT NULL,
+	contentHash text NOT NULL,
+	summary text NOT NULL,
+	model text NOT NULL,
+	createdAt text NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS chapter_summary_chapter_idx ON ChapterSummary (chapterId, contentHash)`,
+  `CREATE INDEX IF NOT EXISTS chapter_summary_novel_idx ON ChapterSummary (novelId)`,
+  `CREATE TABLE IF NOT EXISTS NovelGlossary (
+	id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	novelId integer NOT NULL,
+	canonical text NOT NULL,
+	kind text DEFAULT 'term' NOT NULL,
+	aliases text DEFAULT '[]' NOT NULL,
+	note text,
+	firstSeenChapterId integer,
+	firstSeenChapterNumber integer,
+	pinned integer DEFAULT false NOT NULL,
+	createdAt text NOT NULL,
+	updatedAt text NOT NULL
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS novel_glossary_term_unique ON NovelGlossary (novelId, canonical)`,
+  `CREATE INDEX IF NOT EXISTS novel_glossary_novel_idx ON NovelGlossary (novelId, kind)`,
 ];
 
 /**

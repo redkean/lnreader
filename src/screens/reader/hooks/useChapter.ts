@@ -37,6 +37,7 @@ import NativeVolumeButtonListener from '@modules/native-volume-button-listener';
 import NativeFile from '@modules/native-file';
 import { useNovelActions, useNovelValue } from '@screens/novel/NovelContext';
 import useTimeTracking from './useTimeTracking';
+import useChapterAI from './useChapterAI';
 import { useEventListener } from 'expo';
 
 type AdjacentChapters = [
@@ -89,6 +90,18 @@ export default function useChapter(
     timeTrackingEnabled,
     increaseTimeSpent,
   );
+
+  const chapterAI = useChapterAI(webViewRef, novel, chapter, chapterText);
+
+  /**
+   * Held in a ref so warming the next chapter's AI passes never becomes a
+   * dependency of `resolveAdjacentChapters`, which the whole chapter context
+   * hangs off.
+   */
+  const prefetchChapterAIRef = useRef(chapterAI.prefetchChapterAI);
+  useEffect(() => {
+    prefetchChapterAIRef.current = chapterAI.prefetchChapterAI;
+  }, [chapterAI.prefetchChapterAI]);
 
   /**
    * Mirrors of state that async work reads. Keeping them in refs is what makes
@@ -283,6 +296,7 @@ export default function useChapter(
         let prevChap = prevChapResult;
         publish([nextChap, prevChap]);
         prefetchChapter(nextChap);
+        prefetchChapterAIRef.current(nextChap);
 
         const totalPages = novel.totalPages ?? 0;
         const currentPage = Number(chap.page);
@@ -301,6 +315,7 @@ export default function useChapter(
           if (nextChap) {
             publish([nextChap, prevChap]);
             prefetchChapter(nextChap);
+            prefetchChapterAIRef.current(nextChap);
           }
         }
         if (!prevChap && currentPage > 1) {
@@ -538,8 +553,10 @@ export default function useChapter(
       getChapter,
       onUserInteraction,
       isTTSReadingRef,
+      ...chapterAI,
     }),
     [
+      chapterAI,
       chapter,
       nextChapter,
       prevChapter,

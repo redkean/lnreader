@@ -142,6 +142,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
     onUserInteraction,
     isTTSReadingRef,
     refetch,
+    aiHydrateScriptRef,
+    handleAIMessage,
   } = useChapterContext();
   const theme = useTheme();
   const initialReaderSettings = useMemo(
@@ -329,6 +331,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
               <link rel="stylesheet" href="${assetsUriPrefix}/css/pageReader.css">
               <link rel="stylesheet" href="${assetsUriPrefix}/css/toolWrapper.css">
               <link rel="stylesheet" href="${assetsUriPrefix}/css/tts.css">
+              <link rel="stylesheet" href="${assetsUriPrefix}/css/ai.css">
               <style>
               :root {
                 --StatusBar-currentHeight: ${StatusBar.currentHeight}px;
@@ -417,6 +420,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
               <script src="${assetsUriPrefix}/js/search.js"></script>
               <script src="${assetsUriPrefix}/js/index.js"></script>
               <script src="${assetsUriPrefix}/js/textRemover.js"></script>
+              <script src="${assetsUriPrefix}/js/aiCleanup.js"></script>
               <script src="${pluginCustomJS}"></script>
               <script id="ln-custom-js">
               function fn(){
@@ -477,6 +481,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
           webViewRef.current?.injectJavaScript(
             adjacentChapterScriptRef.current,
           );
+          webViewRef.current?.injectJavaScript(aiHydrateScriptRef.current);
 
           const searchText = searchTextRef.current.trim();
           if (searchText) {
@@ -612,6 +617,10 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
               break;
             case 'interaction':
               onUserInteraction();
+              break;
+            case 'ai-edit-tap':
+            case 'ai-revert-paragraph':
+              handleAIMessage(event.type, event.data);
               break;
           }
         }}

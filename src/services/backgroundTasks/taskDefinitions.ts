@@ -17,6 +17,7 @@ const MULTIPLICABLE_TASKS: BackgroundTask['name'][] = [
   'IMPORT_EPUB',
   'EXPORT_EPUB',
   'MIGRATE_NOVEL',
+  'AI_PROCESS_CHAPTERS',
 ];
 
 const BACKGROUND_TASK_QUEUE_PREFIX = 'lnreader-background-task';
@@ -102,6 +103,10 @@ export const getBackgroundTaskTitle = (task: BackgroundTask) => {
       return `${getString('notifications.MIGRATE_NOVEL')}: ${
         task.data.fromNovel.name
       }`;
+    case 'AI_PROCESS_CHAPTERS':
+      return `${getString('notifications.AI_PROCESS_CHAPTERS')}: ${
+        task.data.novelName
+      }`;
     case 'UPDATE_LIBRARY':
       return task.data?.categoryName
         ? `${getString('notifications.UPDATE_LIBRARY')}: ${
@@ -127,6 +132,8 @@ export const createBackgroundTaskMetadata = (
       ? task.data.files[0]?.filename
       : task.name === 'EXPORT_EPUB'
       ? getString('novelScreen.epub.preparingExport')
+      : task.name === 'AI_PROCESS_CHAPTERS'
+      ? task.data.chapters[0]?.chapterName
       : undefined,
 });
 
