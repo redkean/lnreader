@@ -21,6 +21,8 @@ import {
 import { sanitizeChapterText } from '@screens/reader/utils/sanitizeChapterText';
 import { extractTtsParagraphs } from '@screens/reader/utils/ttsParagraphs';
 import { toNativeTtsSettings } from '@screens/reader/utils/ttsSettings';
+import { getAISettings } from '@hooks/persisted/useAISettings';
+import { hashChapterText, readCleanupSidecar } from '@services/ai';
 import { fetchChapter } from '@services/plugin/fetch';
 import { getMMKVObject } from '@utils/mmkv/mmkv';
 import { NOVEL_STORAGE } from '@utils/Storages';
@@ -34,6 +36,41 @@ export interface TtsPlayerTrack {
   novel: NovelInfo;
   chapter: ChapterInfo;
 }
+
+/**
+ * The cleaned paragraphs to speak instead of the chapter's own, keyed by
+ * readable-node index. Playback follows the reader's preference: with cleaned
+ * text hidden, or a sidecar written against different source text, the
+ * chapter is spoken as it was translated. Paragraphs the reader reverted stay
+ * original too.
+ */
+const cleanedParagraphsFor = async (
+  novel: NovelInfo,
+  chapter: ChapterInfo,
+  html: string,
+): Promise<Map<number, string> | undefined> => {
+  const settings = getAISettings();
+  if (!settings.enabled || !settings.preferCleaned) {
+    return undefined;
+  }
+  const sidecar = await readCleanupSidecar(
+    novel.pluginId,
+    chapter.novelId,
+    chapter.id,
+    hashChapterText(html),
+  );
+  if (!sidecar) {
+    return undefined;
+  }
+  const reverted = new Set(sidecar.reverted);
+  const cleaned = new Map<number, string>();
+  for (const paragraph of sidecar.paragraphs) {
+    if (!reverted.has(paragraph.index)) {
+      cleaned.set(paragraph.index, paragraph.cleaned);
+    }
+  }
+  return cleaned.size ? cleaned : undefined;
+};
 
 const excludedScanlatorsFor = (novel: NovelInfo): string[] =>
   getMMKVObject<{ excludedScanlators?: string[] }>(
@@ -58,6 +95,7 @@ export const useTtsPlayer = () => {
   const sessionPromiseRef = useRef<Promise<TtsSession> | null>(null);
   const subscriptionsRef = useRef<{ remove(): void }[]>([]);
   const queueCacheRef = useRef(new Map<number, Promise<string[]>>());
+  const prefetchedIdsRef = useRef(new Set<number>());
   const trackRef = useRef<TtsPlayerTrack | null>(null);
   const advancingRef = useRef(false);
   const prefetchedForRef = useRef<number | null>(null);
@@ -112,8 +150,15 @@ export const useTtsPlayer = () => {
         } catch {
           text = await fetchChapter(novel.pluginId, chapter.path);
         }
+        const html = sanitizeChapterText(
+          novel.pluginId,
+          novel.name,
+          chapter.name,
+          text,
+        );
         return extractTtsParagraphs(
-          sanitizeChapterText(novel.pluginId, novel.name, chapter.name, text),
+          html,
+          await cleanedParagraphsFor(novel, chapter, html),
         );
       })();
 
@@ -149,6 +194,13 @@ export const useTtsPlayer = () => {
       trackRef.current = next;
       prefetchedForRef.current = null;
       setTrack(next);
+
+      // A chapter started by hand is rebuilt: cleanup may have run since it
+      // was last read, and the queue has to speak what the reader now shows.
+      // A chapter the player prefetched for itself keeps its warm queue.
+      if (!prefetchedIdsRef.current.delete(chapter.id)) {
+        queueCacheRef.current.delete(chapter.id);
+      }
 
       try {
         const queue = await loadChapterParagraphs(novel, chapter);
@@ -261,7 +313,10 @@ export const useTtsPlayer = () => {
     void (async () => {
       const upcoming = await resolveAdjacent(current, 'NEXT');
       if (upcoming) {
-        loadChapterParagraphs(current.novel, upcoming).catch(() => {});
+        prefetchedIdsRef.current.add(upcoming.id);
+        loadChapterParagraphs(current.novel, upcoming).catch(() => {
+          prefetchedIdsRef.current.delete(upcoming.id);
+        });
       }
     })();
   }, [progress, loadChapterParagraphs, resolveAdjacent]);
