@@ -106,6 +106,7 @@ const NovelAppbar = ({
   refreshNovel,
   editCategories,
   showJumpToChapterModal,
+  showSelectRangeModal,
   headerOpacity,
   hideActions = false,
 }: {
@@ -122,6 +123,7 @@ const NovelAppbar = ({
   refreshNovel: () => void;
   editCategories: () => void;
   showJumpToChapterModal: (arg: boolean) => void;
+  showSelectRangeModal: () => void;
   headerOpacity: SharedValue<number>;
   hideActions?: boolean;
 }) => {
@@ -204,6 +206,10 @@ const NovelAppbar = ({
 
     items.push(
       {
+        label: getString('novelScreen.selectRange.title'),
+        onPress: showSelectRangeModal,
+      },
+      {
         label: getString('webview.share'),
         onPress: shareNovel,
       },
@@ -226,6 +232,7 @@ const NovelAppbar = ({
     setCustomNovelCover,
     shareNovel,
     showEditInfoModal,
+    showSelectRangeModal,
   ]);
 
   const openDlMenu = useCallback(() => showDownloadMenu(true), []);

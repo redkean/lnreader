@@ -31,6 +31,7 @@ import { backgroundTasks } from '@services/backgroundTasks';
 import { getPageChapterIds } from '@database/queries/ChapterQueries';
 import { useAISettings } from '@hooks/persisted/useAISettings';
 import AIJobDialog from './components/AIJobDialog';
+import SelectChapterRangeModal from './components/SelectChapterRangeModal';
 import type { ChapterInfo } from '@database/types';
 
 const Novel = ({ route, navigation }: NovelScreenProps) => {
@@ -87,6 +88,18 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     setTrue: openDlChapterModal,
     setFalse: closeDlChapterModal,
   } = useBoolean();
+
+  const {
+    value: selectRangeModalVisible,
+    setTrue: openSelectRangeModal,
+    setFalse: closeSelectRangeModal,
+  } = useBoolean();
+
+  const selectChapterRange = useCallback(
+    (ids: number[]) =>
+      setSelected(prev => Array.from(new Set([...prev, ...ids]))),
+    [setSelected],
+  );
 
   const aiEnabled = useAISettings().enabled;
   const [aiJobChapters, setAiJobChapters] = useState<ChapterInfo[]>();
@@ -160,6 +173,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
               setCustomNovelCover={setCustomNovelCover}
               downloadCustomChapterModal={openDlChapterModal}
               showJumpToChapterModal={showJumpToChapterModal}
+              showSelectRangeModal={openSelectRangeModal}
               shareNovel={shareNovel}
               refreshNovel={onRefresh}
               editCategories={showSetCategoriesModal}
@@ -183,6 +197,11 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
               <Appbar.Content
                 title={`${selected.length}`}
                 titleStyle={titleStyle}
+              />
+              <Appbar.Action
+                icon="format-list-numbered"
+                iconColor={theme.onBackground}
+                onPress={openSelectRangeModal}
               />
               <Appbar.Action
                 icon="select-all"
@@ -277,6 +296,12 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
                 chapters={chapters}
                 theme={theme}
                 downloadChapters={downloadChapters}
+              />
+              <SelectChapterRangeModal
+                visible={selectRangeModalVisible}
+                hideModal={closeSelectRangeModal}
+                novel={novel}
+                onSelect={selectChapterRange}
               />
             </>
           ) : null}

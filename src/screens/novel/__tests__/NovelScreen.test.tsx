@@ -38,13 +38,21 @@ jest.mock('@services/backgroundTasks', () => ({
   },
 }));
 
-jest.mock('@hooks', () => ({
-  useBoolean: () => ({
-    value: false,
-    setTrue: jest.fn(),
-    setFalse: jest.fn(),
-  }),
-}));
+jest.mock('@hooks', () => {
+  const React = require('react');
+  return {
+    useBoolean: (defaultValue?: boolean) => {
+      const [value, setValue] = React.useState(!!defaultValue);
+      return {
+        value,
+        setValue,
+        setTrue: React.useCallback(() => setValue(true), []),
+        setFalse: React.useCallback(() => setValue(false), []),
+        toggle: React.useCallback(() => setValue((x: boolean) => !x), []),
+      };
+    },
+  };
+});
 
 jest.mock('../NovelContext', () => ({
   useNovelValue: (key: string) => mockUseNovelValue(key),
@@ -230,6 +238,22 @@ jest.mock('../components/DownloadCustomChapterModal', () => {
     );
 });
 
+jest.mock('../components/SelectChapterRangeModal', () => {
+  const React = require('react');
+  const { Pressable, Text } = require('react-native');
+  return ({ visible, onSelect }: any) =>
+    visible
+      ? React.createElement(
+          Pressable,
+          {
+            testID: 'select-range-modal',
+            onPress: () => onSelect([10, 500, 501]),
+          },
+          React.createElement(Text, null, 'select-range'),
+        )
+      : null;
+});
+
 jest.mock('../components/LoadingAnimation/NovelScreenLoading', () => {
   const React = require('react');
   const { Text } = require('react-native');
@@ -374,6 +398,25 @@ describe('NovelScreen (task 12 context boundary cutover)', () => {
     expect(store.state.markChaptersRead).toHaveBeenCalledWith(
       Array.from({ length: 1001 }, (_, index) => index + 1),
     );
+  });
+
+  it('adds a chapter range to the current selection', async () => {
+    const store = createStore();
+    wireStoreSelectors(store);
+
+    render(
+      // @ts-expect-error narrowed test props
+      <NovelScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.press(screen.getByTestId('select-unread'));
+    fireEvent.press(screen.getByTestId('appbar-action-format-list-numbered'));
+    fireEvent.press(screen.getByTestId('select-range-modal'));
+
+    expect(await screen.findByText('3')).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByTestId('action-check'));
+    expect(store.state.markChaptersRead).toHaveBeenCalledWith([10, 500, 501]);
   });
 
   it('uses the atomic unread and progress-reset workflow', () => {

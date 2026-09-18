@@ -4,6 +4,7 @@ import {
   sql,
   inArray,
   and,
+  gte,
   lte,
   isNotNull,
   desc,
@@ -612,6 +613,33 @@ export const getPageChapterIds = async (
     .select({ id: chapterSchema.id })
     .from(chapterSchema)
     .where(and(...conditions))
+    .all();
+
+  return rows.map(chapter => chapter.id);
+};
+
+export const getPageChapterIdsInRange = async (
+  novelId: number,
+  fromNumber: number,
+  toNumber: number,
+  filter?: ChapterFilterKey[],
+  page?: string,
+  excludedScanlators?: string[],
+): Promise<number[]> => {
+  const conditions = [
+    eq(chapterSchema.novelId, novelId),
+    eq(chapterSchema.page, page || '1'),
+    gte(chapterSchema.position, fromNumber - 1),
+    lte(chapterSchema.position, toNumber - 1),
+    chapterFilterToSQL(filter),
+    scanlatorFilterToSQL(excludedScanlators),
+  ].filter(Boolean) as any[];
+
+  const rows = await dbManager
+    .select({ id: chapterSchema.id })
+    .from(chapterSchema)
+    .where(and(...conditions))
+    .orderBy(asc(chapterSchema.position))
     .all();
 
   return rows.map(chapter => chapter.id);

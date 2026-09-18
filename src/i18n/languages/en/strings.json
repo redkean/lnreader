@@ -699,6 +699,17 @@
     "notFound": "Novel not found on the source",
     "progress": "Progress %{progress} %",
     "readChaptersDeleted": "Read chapters deleted",
+    "selectRange": {
+      "description": "Select every chapter in a range so you can download, clean up, or mark them at once.",
+      "error": {
+        "invalidRange": "Enter a valid chapter range"
+      },
+      "from": "From chapter",
+      "select": "Select",
+      "title": "Select chapters",
+      "to": "To chapter",
+      "toLatestHint": "Leave empty for the latest chapter"
+    },
     "startReadingChapters": "Start reading %{name}",
     "status": {
       "cancelled": "Cancelled",

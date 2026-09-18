@@ -26,6 +26,7 @@ import {
   getCustomPages,
   getPageChapters,
   getPageChapterIds,
+  getPageChapterIdsInRange,
   getChapterCount,
   getChapterCountSync,
   getPageChaptersBatched,
@@ -920,6 +921,60 @@ describe('ChapterQueries', () => {
       );
 
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('getPageChapterIdsInRange', () => {
+    const insertPositions = async (
+      testDb: ReturnType<typeof getTestDb>,
+      novelId: number,
+    ) => {
+      const ids: number[] = [];
+      for (let position = 0; position < 5; position++) {
+        ids.push(
+          await insertTestChapter(testDb, novelId, {
+            name: `Chapter ${position + 1}`,
+            page: '1',
+            position,
+            unread: position % 2 === 0,
+          }),
+        );
+      }
+      return ids;
+    };
+
+    it('maps 1-based chapter numbers onto positions, inclusive at both ends', async () => {
+      const testDb = getTestDb();
+      const novelId = await insertTestNovel(testDb, { inLibrary: true });
+      const ids = await insertPositions(testDb, novelId);
+
+      expect(await getPageChapterIdsInRange(novelId, 2, 4)).toEqual([
+        ids[1],
+        ids[2],
+        ids[3],
+      ]);
+      expect(await getPageChapterIdsInRange(novelId, 1, 1)).toEqual([ids[0]]);
+      expect(await getPageChapterIdsInRange(novelId, 5, 5)).toEqual([ids[4]]);
+      expect(await getPageChapterIdsInRange(novelId, 1, 5)).toEqual(ids);
+    });
+
+    it('keeps the chapter filter and page scope', async () => {
+      const testDb = getTestDb();
+      const novelId = await insertTestNovel(testDb, { inLibrary: true });
+      const ids = await insertPositions(testDb, novelId);
+      await insertTestChapter(testDb, novelId, {
+        name: 'Other page',
+        page: '2',
+        position: 1,
+        unread: true,
+      });
+
+      expect(
+        await getPageChapterIdsInRange(novelId, 1, 5, ['not-read']),
+      ).toEqual([ids[0], ids[2], ids[4]]);
+      expect(
+        await getPageChapterIdsInRange(novelId, 1, 5, [], '2'),
+      ).toHaveLength(1);
     });
   });
 

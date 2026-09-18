@@ -600,6 +600,13 @@ export interface StringMap {
   'novelScreen.notFound': 'string';
   'novelScreen.progress': 'string';
   'novelScreen.readChaptersDeleted': 'string';
+  'novelScreen.selectRange.description': 'string';
+  'novelScreen.selectRange.error.invalidRange': 'string';
+  'novelScreen.selectRange.from': 'string';
+  'novelScreen.selectRange.select': 'string';
+  'novelScreen.selectRange.title': 'string';
+  'novelScreen.selectRange.to': 'string';
+  'novelScreen.selectRange.toLatestHint': 'string';
   'novelScreen.startReadingChapters': 'string';
   'novelScreen.status.cancelled': 'string';
   'novelScreen.status.completed': 'string';
