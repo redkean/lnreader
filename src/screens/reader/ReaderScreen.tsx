@@ -9,6 +9,8 @@ import ReaderBottomSheetV2 from './components/ReaderBottomSheet/ReaderBottomShee
 import AIDialogs from './components/AIDialogs';
 import ChapterDrawer from './components/ChapterDrawer';
 import ChapterLoadingScreen from './ChapterLoadingScreen/ChapterLoadingScreen';
+import TtsPlayerView from '@screens/ttsPlayer/components/TtsPlayerView';
+import { useTtsPlayerContext } from '@components/Context/TtsPlayerContext';
 import { ErrorScreenV2 } from '@components';
 import { ChapterScreenProps } from '@navigators/types';
 import { getString } from '@i18n/translations';
@@ -98,6 +100,7 @@ export const ChapterContent = ({
     refetch,
   } = useChapterContext();
   const hidden = useReaderChromeHidden();
+  const { chapter: ttsChapter, playChapter } = useTtsPlayerContext();
   const readerSheetRef = useRef<BottomSheetModalMethods>(null);
   const theme = useTheme();
   const { pageReader = false, keepScreenOn } = useChapterGeneralSettings();
@@ -105,6 +108,12 @@ export const ChapterContent = ({
     chapter.bookmark ?? false,
   );
   const [searchVisible, setSearchVisible] = useState(false);
+  /**
+   * The on-the-go player takes over the reader in place. The WebView stays
+   * mounted underneath so paragraph highlighting keeps following playback and
+   * closing the player is instant.
+   */
+  const [ttsPlayerVisible, setTtsPlayerVisible] = useState(false);
   const [searchResult, setSearchResult] = useState<ReaderSearchResult>(
     EMPTY_READER_SEARCH_RESULT,
   );
@@ -149,13 +158,18 @@ export const ChapterContent = ({
 
   useBackHandler(
     useCallback(() => {
+      if (ttsPlayerVisible) {
+        setTtsPlayerVisible(false);
+        return true;
+      }
+
       if (searchVisible) {
         setSearchVisible(false);
         return true;
       }
 
       return false;
-    }, [searchVisible]),
+    }, [searchVisible, ttsPlayerVisible]),
   );
 
   useEffect(() => {
@@ -203,6 +217,21 @@ export const ChapterContent = ({
       );
     });
   }, [onUserInteraction, pageReader, webViewRef]);
+
+  /**
+   * Opening the player from the reader also starts the chapter being read, so
+   * the button is a "listen to this" and not a window onto an empty queue. A
+   * chapter the player already owns is left alone, so its position survives.
+   */
+  const openTtsPlayer = useCallback(() => {
+    onUserInteraction();
+    setTtsPlayerVisible(true);
+    if (ttsChapter?.id !== chapter.id) {
+      void playChapter(novel, chapter);
+    }
+  }, [chapter, novel, onUserInteraction, playChapter, ttsChapter?.id]);
+
+  const closeTtsPlayer = useCallback(() => setTtsPlayerVisible(false), []);
 
   const openDrawerI = useCallback(() => {
     openDrawer();
@@ -280,7 +309,12 @@ export const ChapterContent = ({
         <ReaderBottomSheetV2 bottomSheetRef={readerSheetRef} />
       ) : null}
       <AIDialogs />
-      {!hidden ? (
+      {ttsPlayerVisible ? (
+        <View style={styles.ttsPlayer}>
+          <TtsPlayerView onClose={closeTtsPlayer} />
+        </View>
+      ) : null}
+      {!hidden && !ttsPlayerVisible ? (
         <>
           <ReaderAppbar
             goBack={navigation.goBack}
@@ -303,6 +337,7 @@ export const ChapterContent = ({
               openReaderSheet={openReaderSheet}
               scrollToStart={scrollToStart}
               openDrawer={openDrawerI}
+              openTtsPlayer={openTtsPlayer}
             />
           ) : null}
         </>
@@ -316,4 +351,12 @@ export default Chapter;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   drawer: { backgroundColor: 'transparent' },
+  ttsPlayer: {
+    bottom: 0,
+    end: 0,
+    position: 'absolute',
+    start: 0,
+    top: 0,
+    zIndex: 2,
+  },
 });

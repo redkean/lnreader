@@ -9,12 +9,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useChapterContext } from '../ChapterContext';
 import { useTheme } from '@hooks/persisted';
+import { getString } from '@i18n/translations';
 import { useNovelLayout } from '@screens/novel/NovelContext';
 
 interface ChapterFooterProps {
   openReaderSheet: () => void;
   scrollToStart: () => void;
   openDrawer: () => void;
+  openTtsPlayer: () => void;
 }
 
 const fastOutSlowIn = Easing.bezier(0.4, 0.0, 0.2, 1.0);
@@ -65,6 +67,7 @@ const ChapterFooter = ({
   openReaderSheet,
   scrollToStart,
   openDrawer,
+  openTtsPlayer,
 }: ChapterFooterProps) => {
   const { nextChapter, prevChapter, navigateChapter } = useChapterContext();
   const theme = useTheme();
@@ -131,6 +134,18 @@ const ChapterFooter = ({
         >
           <IconButton
             icon="format-list-bulleted"
+            size={26}
+            iconColor={theme.onSurface}
+          />
+        </Pressable>
+        <Pressable
+          android_ripple={rippleConfig}
+          style={styles.buttonStyles}
+          onPress={openTtsPlayer}
+          accessibilityLabel={getString('ttsPlayer.listen')}
+        >
+          <IconButton
+            icon="headphones"
             size={26}
             iconColor={theme.onSurface}
           />
