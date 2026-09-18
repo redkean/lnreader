@@ -14,6 +14,7 @@ internal class TtsPlaybackService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         mediaNotification = TtsMediaNotification(this)
         val snapshot = TtsPlaybackStore.snapshot()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -42,6 +43,7 @@ internal class TtsPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         removeSnapshotListener?.invoke()
         removeSnapshotListener = null
         mediaNotification.release()
@@ -58,12 +60,28 @@ internal class TtsPlaybackService : Service() {
         internal const val ACTION_PREVIOUS = "com.lnreader.TTS_PREVIOUS"
         internal const val ACTION_NEXT = "com.lnreader.TTS_NEXT"
 
+        @Volatile
+        private var isRunning = false
+
+        /**
+         * Starts the playback service unless it is already running.
+         *
+         * Android 12+ refuses `startForegroundService()` while the app sits in the
+         * background, so a service that is already up must never be restarted - crossing a
+         * chapter boundary with the screen off would otherwise throw
+         * `ForegroundServiceStartNotAllowedException`.
+         */
         fun start(context: Context) {
+            if (isRunning) {
+                return
+            }
             val intent = Intent(context, TtsPlaybackService::class.java)
             ContextCompat.startForegroundService(context, intent)
+            isRunning = true
         }
 
         fun stop(context: Context) {
+            isRunning = false
             context.stopService(Intent(context, TtsPlaybackService::class.java))
         }
 

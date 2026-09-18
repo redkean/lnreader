@@ -167,7 +167,15 @@ internal object TtsPlaybackStore {
         emitState()
 
         val context = checkNotNull(applicationContext)
-        TtsPlaybackService.start(context)
+        try {
+            TtsPlaybackService.start(context)
+        } catch (cause: Exception) {
+            // Android can refuse a foreground service start while the app is backgrounded.
+            // Playback still works, so surface the lost notification instead of failing load().
+            errorListeners.emit(
+                "Playback controls are unavailable: ${cause.message ?: "the media notification could not start."}",
+            )
+        }
     }
 
     fun play() {
@@ -415,10 +423,16 @@ internal object TtsPlaybackStore {
         speakCurrent()
     }
 
+    /**
+     * Ends the queue without tearing the playback service down.
+     *
+     * The service is what keeps the app alive across a chapter boundary with the screen off;
+     * stopping it here would leave the next [load] to call `startForegroundService()` from the
+     * background, which Android 12+ rejects. [stop] is the only place that shuts it down.
+     */
     private fun completeQueue() {
         state = TtsPlaybackState.COMPLETED
         emitState()
-        applicationContext?.let { TtsPlaybackService.stop(it) }
     }
 
     private fun fail(message: String) {
