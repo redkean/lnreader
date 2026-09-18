@@ -10,7 +10,12 @@ type ChapterContextType = ReturnType<typeof useChapter>['chapterContext'] & {
 
 const defaultValue = {} as ChapterContextType;
 
-const ChapterContext = createContext<ChapterContextType>(defaultValue);
+/**
+ * Exported so the reader's bottom sheet can re-provide it: the sheet renders
+ * through a portal whose host sits above this screen, and React context does
+ * not cross that portal.
+ */
+export const ChapterContext = createContext<ChapterContextType>(defaultValue);
 
 /**
  * Whether the reader chrome is hidden. It lives in its own context because it

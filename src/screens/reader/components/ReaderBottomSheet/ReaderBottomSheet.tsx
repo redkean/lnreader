@@ -16,6 +16,12 @@ import React, {
 import Color from 'color';
 
 import { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
+import {
+  NavigationContext,
+  useNavigation,
+  type NavigationProp,
+  type ParamListBase,
+} from '@react-navigation/native';
 import BottomSheet from '@components/BottomSheet/BottomSheet';
 import { List, TopTabBar } from '@components';
 import { useChapterGeneralSettings, useTheme } from '@hooks/persisted';
@@ -32,6 +38,7 @@ import TTSTab from './TTSTab';
 import AITab from './AITab';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import { StringMap } from '@i18n/types';
+import { ChapterContext, useChapterContext } from '../../ChapterContext';
 
 type TabViewLabelProps = {
   route: {
@@ -207,6 +214,13 @@ const ReaderBottomSheetV2: React.FC<ReaderBottomSheetV2Props> = ({
   const theme = useTheme();
   const layout = useWindowDimensions();
 
+  // The sheet's contents are rendered by a portal host that lives above the
+  // navigator, so nothing inside inherits this screen's contexts. Read them
+  // here, where we are still part of the reader's tree, and hand them back to
+  // the tabs on the other side of the portal.
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const chapterContext = useChapterContext();
+
   const tabHeaderColor = theme.surfaceContainerLow ?? theme.surface;
 
   const renderScene = useMemo(
@@ -248,23 +262,27 @@ const ReaderBottomSheetV2: React.FC<ReaderBottomSheetV2Props> = ({
 
   return (
     <BottomSheet bottomSheetRef={bottomSheetRef} snapPoints={[360, 600]}>
-      <BottomSheetView style={styles.flex}>
-        <TabView
-          commonOptions={{
-            label: renderLabel,
-          }}
-          navigationState={{ index, routes }}
-          renderTabBar={renderTabBar}
-          renderScene={renderScene}
-          onIndexChange={setIndex}
-          initialLayout={{ width: layout.width }}
-          style={styles.tabView}
-          // Without this every tab is mounted at once – the TTS tab alone
-          // enumerates the device's engines and voices over the bridge.
-          lazy
-          renderLazyPlaceholder={renderLazyPlaceholder}
-        />
-      </BottomSheetView>
+      <NavigationContext.Provider value={navigation}>
+        <ChapterContext.Provider value={chapterContext}>
+          <BottomSheetView style={styles.flex}>
+            <TabView
+              commonOptions={{
+                label: renderLabel,
+              }}
+              navigationState={{ index, routes }}
+              renderTabBar={renderTabBar}
+              renderScene={renderScene}
+              onIndexChange={setIndex}
+              initialLayout={{ width: layout.width }}
+              style={styles.tabView}
+              // Without this every tab is mounted at once – the TTS tab alone
+              // enumerates the device's engines and voices over the bridge.
+              lazy
+              renderLazyPlaceholder={renderLazyPlaceholder}
+            />
+          </BottomSheetView>
+        </ChapterContext.Provider>
+      </NavigationContext.Provider>
     </BottomSheet>
   );
 };
