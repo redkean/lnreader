@@ -1,3 +1,6 @@
+def applicationIdOverride = providers
+    .gradleProperty("applicationIdOverride")
+
 def releaseAbiSplitsEnabled = providers
     .gradleProperty("releaseAbiSplits")
     .map { value -> value.toBoolean() }
@@ -9,6 +12,10 @@ react {
 
 android {
     defaultConfig {
+        if (applicationIdOverride.isPresent()) {
+            applicationId applicationIdOverride.get()
+        }
+
         // Library resources (Material Components, RN, play-services) only for
         // languages the app itself ships (src/i18n/languages/*); other locales
         // fall back to English, matching the app's own JS fallback.
