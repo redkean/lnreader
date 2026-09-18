@@ -160,7 +160,10 @@ export default function useChapterAI(
             contentHash,
             model: current.model.trim(),
             glossary: current.glossaryEnabled
-              ? getGlossaryForPrompt(novel.id, chapter.chapterNumber ?? 0)
+              ? getGlossaryForPrompt(
+                  chapter.novelId,
+                  chapter.chapterNumber ?? 0,
+                )
               : [],
             paragraphsPerBatch: current.paragraphsPerBatch,
             reverted: force ? [] : existing?.reverted,
@@ -182,7 +185,7 @@ export default function useChapterAI(
         );
         await saveChapterCleanupIndex({
           chapterId: chapter.id,
-          novelId: novel.id,
+          novelId: chapter.novelId,
           contentHash,
           model: current.model.trim(),
           paragraphCount: result.sidecar.paragraphs.length,
@@ -208,7 +211,6 @@ export default function useChapterAI(
       chapterText,
       contentHash,
       enabled,
-      novel.id,
       novel.pluginId,
       running,
     ],
@@ -239,7 +241,10 @@ export default function useChapterAI(
             chapterName: chapter.name,
             html: chapterText,
             knownTerms: current.glossaryEnabled
-              ? getGlossaryForPrompt(novel.id, chapter.chapterNumber ?? 0)
+              ? getGlossaryForPrompt(
+                  chapter.novelId,
+                  chapter.chapterNumber ?? 0,
+                )
               : [],
           },
           controller.signal,
@@ -247,13 +252,13 @@ export default function useChapterAI(
 
         await saveChapterSummary({
           chapterId: chapter.id,
-          novelId: novel.id,
+          novelId: chapter.novelId,
           contentHash,
           summary: analysis.summary,
           model: current.model.trim(),
         });
         if (current.glossaryEnabled) {
-          await upsertGlossaryTerms(novel.id, analysis.terms, {
+          await upsertGlossaryTerms(chapter.novelId, analysis.terms, {
             chapterId: chapter.id,
             chapterNumber: chapter.chapterNumber ?? 0,
           });
@@ -273,10 +278,10 @@ export default function useChapterAI(
       chapter.chapterNumber,
       chapter.id,
       chapter.name,
+      chapter.novelId,
       chapterText,
       contentHash,
       enabled,
-      novel.id,
       novel.name,
       running,
     ],
@@ -293,7 +298,7 @@ export default function useChapterAI(
     try {
       const result = await buildRecap(
         {
-          novelId: novel.id,
+          novelId: chapter.novelId,
           novelName: novel.name,
           position: chapter.position ?? 0,
           chapterCount: getAISettings().recapChapterCount,
@@ -309,7 +314,14 @@ export default function useChapterAI(
       abortRef.current = undefined;
       setRunning(undefined);
     }
-  }, [chapter.id, chapter.position, enabled, novel.id, novel.name, running]);
+  }, [
+    chapter.id,
+    chapter.novelId,
+    chapter.position,
+    enabled,
+    novel.name,
+    running,
+  ]);
 
   const revertParagraph = useCallback(
     async (index: number) => {

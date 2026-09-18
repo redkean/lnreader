@@ -391,9 +391,12 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
         screen: 'Chapter',
         params: {
           novel: {
+            id: history[0].novelId,
             path: history[0].novelPath,
             pluginId: history[0].pluginId,
             name: history[0].novelName,
+            cover: history[0].novelCover,
+            inLibrary: history[0].inLibrary,
           } as NovelInfo,
           chapter: history[0],
         },
