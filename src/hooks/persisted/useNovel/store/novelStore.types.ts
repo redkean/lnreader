@@ -71,6 +71,7 @@ export interface NovelStoreNovelActions {
   openPage: (index: number) => Promise<void>;
   setNovelSettings: (settings: NovelSettings) => void;
   setLastRead: (chapter: ChapterInfo) => void;
+  syncLastReadFromStorage: () => void;
   followNovel: () => Promise<void>;
 }
 
@@ -96,6 +97,7 @@ export interface NovelStoreDependencies {
   persistPageIndex?: (value: number) => void;
   persistNovelSettings?: (value: NovelSettings) => void;
   persistLastRead?: (value: ChapterInfo) => void;
+  readPersistedLastRead?: () => ChapterInfo | undefined;
   switchNovelToLibrary?: (
     novelPath: string,
     pluginId: string,

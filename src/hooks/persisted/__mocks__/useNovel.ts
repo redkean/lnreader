@@ -62,6 +62,7 @@ const useNovel = jest.fn(() => ({
   setNovel: jest.fn(),
   setNovelSettings: jest.fn(),
   setLastRead: jest.fn(),
+  syncLastReadFromStorage: jest.fn(),
   followNovel: jest.fn(),
   setChapters: jest.fn(),
   extendChapters: jest.fn(),

@@ -15,12 +15,13 @@ import DownloadCustomChapterModal from './components/DownloadCustomChapterModal'
 import { useBoolean } from '@hooks';
 import NovelScreenLoading from './components/LoadingAnimation/NovelScreenLoading';
 import { NovelScreenProps } from '@navigators/types';
+import { useFocusEffect } from '@react-navigation/native';
 import { getString } from '@i18n/translations';
 import NovelAppbar from './components/NovelAppbar';
 import NovelScreenList from './components/NovelScreenList';
 import { ThemeColors } from '@theme/types';
 import { EmptyView, SafeAreaView } from '@components';
-import { useNovelActions, useNovelValue } from './NovelContext';
+import { useNovelAction, useNovelActions, useNovelValue } from './NovelContext';
 import { LegendListRef } from '@legendapp/list/react-native';
 import { useCustomNovelCover } from './hooks/useCustomNovelCover';
 import { useChapterSelection } from './hooks/useChapterSelection';
@@ -43,6 +44,16 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
   const pageIndex = useNovelValue('pageIndex');
   const pages = useNovelValue('pages');
   const { setNovel, deleteChapters, refreshNovel } = useNovelActions();
+
+  // The TTS player advances chapters from above the navigator and writes
+  // last-read straight to storage, so a screen that stayed mounted has to
+  // re-read it or Resume keeps offering the chapter playback started on.
+  const syncLastReadFromStorage = useNovelAction('syncLastReadFromStorage');
+  useFocusEffect(
+    useCallback(() => {
+      syncLastReadFromStorage();
+    }, [syncLastReadFromStorage]),
+  );
 
   const theme = useTheme();
   const { downloadNewChapters, refreshNovelMetadata } = useAppSettings();

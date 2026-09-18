@@ -255,6 +255,16 @@ export const createNovelStoreActions = ({
       set({ lastRead: chapter });
       deps.persistLastRead?.(chapter);
     },
+    // `lastRead` is seeded once, when the store is created. The TTS player
+    // advances chapters from above the navigator and writes straight to
+    // storage, so a screen that stayed mounted has to re-read it.
+    syncLastReadFromStorage: () => {
+      const persisted = deps.readPersistedLastRead?.();
+      if (!persisted || persisted.id === get().lastRead?.id) {
+        return;
+      }
+      set({ lastRead: persisted });
+    },
     followNovel: async () => {
       const state = get();
       const currentNovel = state.novel;

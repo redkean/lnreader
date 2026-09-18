@@ -76,6 +76,7 @@ export const createMockNovelStoreState = (
   openPage: jest.fn().mockResolvedValue(undefined),
   setNovelSettings: jest.fn(),
   setLastRead: jest.fn(),
+  syncLastReadFromStorage: jest.fn(),
   followNovel: jest.fn(),
 
   updateChapter: jest.fn(),

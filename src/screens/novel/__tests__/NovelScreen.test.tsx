@@ -57,6 +57,7 @@ jest.mock('@hooks', () => {
 jest.mock('../NovelContext', () => ({
   useNovelValue: (key: string) => mockUseNovelValue(key),
   useNovelActions: () => mockUseNovelActions(),
+  useNovelAction: (key: string) => mockUseNovelActions()[key],
 }));
 
 jest.mock('@services/plugin/fetch', () => ({

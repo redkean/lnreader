@@ -6,9 +6,11 @@ import {
   markChapterRead,
   updateChapterProgress,
 } from '@database/queries/ChapterQueries';
+import { insertHistory } from '@database/queries/HistoryQueries';
 import { ChapterInfo, NovelInfo } from '@database/types';
-import { useChapterReaderSettings } from '@hooks/persisted';
+import { useChapterReaderSettings, useLibrarySettings } from '@hooks/persisted';
 import { keyContract } from '@hooks/persisted/useNovel/store-helper/keyContract';
+import { novelPersistence } from '@hooks/persisted/useNovel/store-helper/persistence';
 import { defaultNovelSettings } from '@hooks/persisted/useNovel/types';
 import NativeFile from '@modules/native-file';
 import {
@@ -25,6 +27,7 @@ import { getAISettings } from '@hooks/persisted/useAISettings';
 import { hashChapterText, readCleanupSidecar } from '@services/ai';
 import { fetchChapter } from '@services/plugin/fetch';
 import { getMMKVObject } from '@utils/mmkv/mmkv';
+import { runWhenIdle } from '@utils/runWhenIdle';
 import { NOVEL_STORAGE } from '@utils/Storages';
 
 const EMPTY_PROGRESS: TtsProgress = { index: 0, total: 0, paragraphId: '' };
@@ -90,6 +93,7 @@ const excludedScanlatorsFor = (novel: NovelInfo): string[] =>
  */
 export const useTtsPlayer = () => {
   const readerSettings = useChapterReaderSettings();
+  const { incognitoMode } = useLibrarySettings();
 
   const sessionRef = useRef<TtsSession | null>(null);
   const sessionPromiseRef = useRef<Promise<TtsSession> | null>(null);
@@ -111,6 +115,39 @@ export const useTtsPlayer = () => {
   useEffect(() => {
     settingsRef.current = readerSettings;
   }, [readerSettings]);
+
+  const incognitoRef = useRef(incognitoMode);
+  useEffect(() => {
+    incognitoRef.current = incognitoMode;
+  }, [incognitoMode]);
+
+  /**
+   * Mirror the writes the reader makes when a chapter is opened. The player
+   * crosses chapter boundaries on its own, with no reader mounted, so without
+   * these Resume keeps pointing at whichever chapter was last opened by hand.
+   *
+   * Scheduled off the critical path and failure-tolerant: nothing here is
+   * needed to start speaking, and neither write may take playback down.
+   */
+  const recordChapterOpened = useCallback(
+    (novel: NovelInfo, chapter: ChapterInfo) => {
+      if (incognitoRef.current) {
+        return;
+      }
+      runWhenIdle(() => {
+        void insertHistory(chapter.id).catch(() => undefined);
+        try {
+          novelPersistence.writeLastRead(
+            { pluginId: novel.pluginId, novelPath: novel.path },
+            chapter,
+          );
+        } catch {
+          // Resume just stays where it was; the queue keeps playing.
+        }
+      });
+    },
+    [],
+  );
 
   const ensureSession = useCallback(async () => {
     if (sessionRef.current) {
@@ -194,6 +231,7 @@ export const useTtsPlayer = () => {
       trackRef.current = next;
       prefetchedForRef.current = null;
       setTrack(next);
+      recordChapterOpened(novel, chapter);
 
       // A chapter started by hand is rebuilt: cleanup may have run since it
       // was last read, and the queue has to speak what the reader now shows.
@@ -230,7 +268,7 @@ export const useTtsPlayer = () => {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [ensureSession, loadChapterParagraphs],
+    [ensureSession, loadChapterParagraphs, recordChapterOpened],
   );
 
   const skipChapter = useCallback(
@@ -285,7 +323,9 @@ export const useTtsPlayer = () => {
     advancingRef.current = true;
     void (async () => {
       try {
-        await markChapterRead(current.chapter.id);
+        if (!incognitoRef.current) {
+          await markChapterRead(current.chapter.id);
+        }
         const advanced = await skipChapter('NEXT');
         if (!advanced) {
           stop();
@@ -323,7 +363,7 @@ export const useTtsPlayer = () => {
 
   useEffect(() => {
     const current = trackRef.current;
-    if (!current || progress.total === 0) {
+    if (!current || progress.total === 0 || incognitoRef.current) {
       return;
     }
     void updateChapterProgress(

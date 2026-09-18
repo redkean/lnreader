@@ -69,6 +69,8 @@ export function createStore({
     },
     persistLastRead: chapter =>
       novelPersistence.writeLastRead(persistenceInput, chapter),
+    readPersistedLastRead: () =>
+      novelPersistence.readLastRead(persistenceInput),
     switchNovelToLibrary,
   };
 
