@@ -1025,5 +1025,9 @@ window.addEventListener('load', () => {
     if (searchQuery) {
       window.readerSearch.search(searchQuery, searchIndex);
     }
+
+    // The cleaned paragraphs were written into the markup that was just
+    // thrown away, so they are put back over the freshly transformed one.
+    window.aiCleanup?.render?.();
   });
 })();

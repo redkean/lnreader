@@ -23,11 +23,19 @@ window.aiCleanup = new (function () {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
+  /**
+   * The reader's text options are applied to the chapter markup as a whole, so
+   * a paragraph whose markup this replaces has to have them applied again -
+   * otherwise bionic reading stops halfway down a cleaned chapter.
+   */
+  const withTextOptions = html =>
+    reader.generalSettings.val.bionicReading ? textVide.textVide(html) : html;
+
   /** Cleaned text with the changed spans wrapped so they can be highlighted. */
   const buildHtml = (entry, withEdits) => {
     const text = entry.cleaned;
     if (!withEdits || !entry.ops || entry.ops.length === 0) {
-      return escapeHtml(text).replace(/\n/g, '<br>');
+      return withTextOptions(escapeHtml(text).replace(/\n/g, '<br>'));
     }
 
     const ops = [...entry.ops].sort((a, b) => a.start - b.start);
@@ -59,7 +67,28 @@ window.aiCleanup = new (function () {
       html += escapeHtml(text.slice(cursor));
     }
 
-    return html.replace(/\n/g, '<br>');
+    return withTextOptions(html.replace(/\n/g, '<br>'));
+  };
+
+  /**
+   * Chapters often wrap a whole paragraph in formatting the reader can see - a
+   * styled span, an em, a font tag. Cleaned text is plain, so writing it
+   * straight into the paragraph would strip that wrapper and leave the
+   * paragraph looking unlike every other one on the page. Wrappers that cover
+   * the entire paragraph are kept and the cleaned text is written inside the
+   * innermost one. Formatting that covers only part of a paragraph cannot
+   * survive a rewrite of the very text it marks up, and is not preserved.
+   */
+  const innermostWrapper = element => {
+    let node = element;
+    while (
+      node.childNodes.length === 1 &&
+      node.children.length === 1 &&
+      normalize(node.children[0].innerText) === normalize(node.innerText)
+    ) {
+      node = node.children[0];
+    }
+    return node;
   };
 
   const elementsByIndex = () => {
@@ -81,7 +110,10 @@ window.aiCleanup = new (function () {
       }
       element.dataset.aiOriginalHtml = element.innerHTML;
     }
-    element.innerHTML = buildHtml(entry, this.showEdits);
+    // Rebuilt from the paragraph's own markup every time, so the formatting
+    // wrappers are the source chapter's rather than the previous render's.
+    element.innerHTML = element.dataset.aiOriginalHtml;
+    innermostWrapper(element).innerHTML = buildHtml(entry, this.showEdits);
     element.classList.add('ai-cleaned');
     return true;
   };
