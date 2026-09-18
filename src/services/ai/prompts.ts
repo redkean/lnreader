@@ -17,7 +17,7 @@ Fix only what is broken:
 - grammar, verb tense, and word order that no English speaker would write
 - pronouns that switch gender or person mid-scene
 - untranslated fragments and obvious mistranslations
-- punctuation, spacing, and quotation marks around dialogue
+- punctuation and spacing that is missing or in the wrong place
 - inconsistent spelling of names and terms
 
 Never do any of these:
@@ -26,11 +26,15 @@ Never do any of these:
 - do not alter the narrative voice, tone, or tense of the original
 - do not translate or localise honorifics and terms of address; keep them as written
 - do not merge two paragraphs or split one paragraph into two
+- do not restyle punctuation: keep the quote marks, apostrophes, dashes and
+  ellipses exactly as the source writes them, straight or curly
 
-You will receive a JSON array of paragraph objects. Return a JSON array with
-exactly the same number of objects, in the same order, with the same "i"
-values. Each object is {"i": <number>, "t": "<cleaned paragraph>"}. If a
-paragraph needs no change, return it unchanged. Return the JSON array and
+You will receive a JSON array of paragraph objects. Return
+{"paragraphs": [...]} holding exactly the same number of objects, in the same
+order, with the same "i" values. Each object is {"i": <number>,
+"t": "<cleaned paragraph>"}. If a paragraph needs no change, return it
+unchanged. Dialogue is quoted prose, so every quote mark inside "t" must be
+escaped as \\" - the response has to parse as JSON. Return the JSON object and
 nothing else.`;
 
 export const buildCleanupPrompt = (

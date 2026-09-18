@@ -7,6 +7,8 @@ import {
   selectCleanableParagraphs,
 } from './paragraphs';
 import { buildCleanupPrompt, CLEANUP_SYSTEM_PROMPT } from './prompts';
+import { CLEANUP_SCHEMA } from './schemas';
+import { preservePunctuationStyle } from './punctuation';
 import { estimateTokens } from './cost';
 import type {
   AICleanedParagraph,
@@ -16,10 +18,23 @@ import type {
   AIUsage,
 } from './types';
 
-export class ParagraphCountMismatchError extends Error {
+/**
+ * A response the cleanup pass cannot use. Retried, then split, then given up
+ * on - one unusable batch never fails the whole chapter.
+ */
+export class CleanupResponseError extends Error {}
+
+export class ParagraphCountMismatchError extends CleanupResponseError {
   constructor(expected: number, received: number) {
     super(`Model returned ${received} paragraphs, expected ${expected}`);
     this.name = 'ParagraphCountMismatchError';
+  }
+}
+
+export class UnparseableResponseError extends CleanupResponseError {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'UnparseableResponseError';
   }
 }
 
@@ -33,26 +48,39 @@ const parseCleanupBatch = (
   batch: AIParagraph[],
   responseText: string,
 ): Map<number, string> => {
-  const parsed = parseJsonResponse<unknown>(responseText);
-  if (!Array.isArray(parsed)) {
+  let parsed: unknown;
+  try {
+    parsed = parseJsonResponse<unknown>(responseText);
+  } catch (error) {
+    // Dialogue-heavy prose makes models drop a closing brace or leave a quote
+    // bare; the batch is worth asking for again rather than losing.
+    throw new UnparseableResponseError(error);
+  }
+  // Structured output is rooted in an object; a provider without it answers
+  // the prompt with the bare array.
+  const entries =
+    !Array.isArray(parsed) && parsed && typeof parsed === 'object'
+      ? (parsed as { paragraphs?: unknown }).paragraphs
+      : parsed;
+  if (!Array.isArray(entries)) {
     throw new ParagraphCountMismatchError(batch.length, 0);
   }
-  if (parsed.length !== batch.length) {
-    throw new ParagraphCountMismatchError(batch.length, parsed.length);
+  if (entries.length !== batch.length) {
+    throw new ParagraphCountMismatchError(batch.length, entries.length);
   }
 
   const expected = new Set(batch.map(paragraph => paragraph.index));
   const result = new Map<number, string>();
 
-  for (const entry of parsed) {
+  for (const entry of entries) {
     if (!entry || typeof entry !== 'object') {
-      throw new ParagraphCountMismatchError(batch.length, parsed.length);
+      throw new ParagraphCountMismatchError(batch.length, entries.length);
     }
     const record = entry as Record<string, unknown>;
     const index = typeof record.i === 'number' ? record.i : undefined;
     const text = typeof record.t === 'string' ? record.t : undefined;
     if (index === undefined || text === undefined || !expected.has(index)) {
-      throw new ParagraphCountMismatchError(batch.length, parsed.length);
+      throw new ParagraphCountMismatchError(batch.length, entries.length);
     }
     result.set(index, text.trim());
   }
@@ -78,6 +106,7 @@ const sendBatch = async (
     // Cleaned prose is about as long as the original; the headroom covers the
     // JSON envelope and a model that runs slightly long.
     maxOutputTokens: Math.ceil(estimateTokens(prompt) * 1.4) + 600,
+    schema: CLEANUP_SCHEMA,
     signal,
   });
 
@@ -104,7 +133,7 @@ const cleanBatch = async (
       usage.current = addUsage(usage.current, result.usage);
       return result.cleaned;
     } catch (error) {
-      if (!(error instanceof ParagraphCountMismatchError)) {
+      if (!(error instanceof CleanupResponseError)) {
         throw error;
       }
     }
@@ -163,7 +192,11 @@ export const cleanChapterHtml = async (
     const cleaned = await cleanBatch(batch, args.glossary, usage, signal);
 
     for (const paragraph of batch) {
-      const text = cleaned.get(paragraph.index);
+      const returned = cleaned.get(paragraph.index);
+      const text =
+        returned === undefined
+          ? undefined
+          : preservePunctuationStyle(paragraph.text, returned);
       if (text === undefined || text === paragraph.text) {
         continue;
       }

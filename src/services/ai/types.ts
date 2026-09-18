@@ -7,12 +7,40 @@ export type AIMessage = {
   content: string;
 };
 
+/**
+ * The subset of JSON Schema every provider understands. Kept deliberately
+ * narrow - an object with declared properties - because that is what OpenAI's
+ * strict mode, Anthropic's tool inputs and Gemini's response schemas all
+ * accept without translation.
+ */
+export type AIJsonSchema = {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required: string[];
+  additionalProperties: false;
+};
+
+/** A response shape the provider is asked to guarantee. */
+export type AIResponseSchema = {
+  /** Identifier the provider shows in errors, and the tool name on Anthropic. */
+  name: string;
+  description: string;
+  schema: AIJsonSchema;
+};
+
 export type AIRequest = {
   messages: AIMessage[];
   /** Upper bound on the response. Cleanup needs roughly the input size back. */
   maxOutputTokens: number;
   /** Deterministic-ish by default: rewriting prose is not a creative task. */
   temperature?: number;
+  /**
+   * Structured output. Providers that support it are asked to return exactly
+   * this shape, which is what keeps dialogue-heavy prose from arriving as
+   * JSON the app cannot parse. Providers - and local runtimes - that reject
+   * it fall back to the prompt's own instructions.
+   */
+  schema?: AIResponseSchema;
   signal?: AbortSignal;
 };
 

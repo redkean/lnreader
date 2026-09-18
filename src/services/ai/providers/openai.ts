@@ -1,5 +1,6 @@
 import type { AIProvider, AIProviderConfig, AIRequest } from '../types';
 import { postJson } from './http';
+import { isSchemaRejection } from './schema';
 
 type ChatCompletionResponse = {
   choices?: { message?: { content?: string } }[];
@@ -32,14 +33,38 @@ const send = async (config: AIProviderConfig, request: AIRequest) => {
     temperature: request.temperature ?? 0.2,
   };
 
-  const json = await postJson<ChatCompletionResponse>(
-    `${baseUrl}/chat/completions`,
-    body,
-    {
-      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+  // Strict mode makes the model's own decoder enforce the shape, which is the
+  // only thing that reliably stops dialogue quotes from arriving unescaped.
+  const responseFormat = request.schema && {
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: request.schema.name,
+        description: request.schema.description,
+        schema: request.schema.schema,
+        strict: true,
+      },
     },
-    request.signal,
-  );
+  };
+
+  const post = (withSchema: boolean) =>
+    postJson<ChatCompletionResponse>(
+      `${baseUrl}/chat/completions`,
+      withSchema ? { ...body, ...responseFormat } : body,
+      {
+        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+      },
+      request.signal,
+    );
+
+  const json = await (responseFormat
+    ? post(true).catch(error => {
+        if (!isSchemaRejection(error)) {
+          throw error;
+        }
+        return post(false);
+      })
+    : post(false));
 
   return {
     text: json.choices?.[0]?.message?.content ?? '',

@@ -2,6 +2,7 @@ import { requestAI } from './client';
 import { parseJsonResponse } from './json';
 import { extractCleanupParagraphs } from './paragraphs';
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisPrompt } from './prompts';
+import { ANALYSIS_SCHEMA } from './schemas';
 import type {
   AIChapterAnalysis,
   AIGlossaryKind,
@@ -102,6 +103,7 @@ export const analyzeChapter = async (
       },
     ],
     maxOutputTokens: 1200,
+    schema: ANALYSIS_SCHEMA,
     signal,
   });
 

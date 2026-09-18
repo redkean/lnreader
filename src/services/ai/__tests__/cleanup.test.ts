@@ -55,6 +55,57 @@ describe('cleanChapterHtml', () => {
     expect(sidecar.paragraphs[0].ops.length).toBeGreaterThan(0);
   });
 
+  it('ignores a paragraph the model only restyled', async () => {
+    respondWith(paragraphs =>
+      paragraphs.map(paragraph => ({
+        i: paragraph.i,
+        t: paragraph.t.replace(/"([^"]*)"/g, '\u201c$1\u201d'),
+      })),
+    );
+
+    const { sidecar, changedCount } = await cleanChapterHtml({
+      html: '<p>"stop," he said</p>',
+      contentHash: 'hash',
+      model: 'test-model',
+      glossary: [],
+      paragraphsPerBatch: 10,
+    });
+
+    expect(changedCount).toBe(0);
+    expect(sidecar.paragraphs).toHaveLength(0);
+  });
+
+  it('reads the object shape structured output returns', async () => {
+    mockedRequest.mockImplementation(async request => {
+      const prompt = request.messages[request.messages.length - 1].content;
+      const payload = JSON.parse(
+        prompt.slice(prompt.indexOf('['), prompt.lastIndexOf(']') + 1),
+      ) as { i: number; t: string }[];
+      return {
+        text: JSON.stringify({
+          paragraphs: payload.map(paragraph =>
+            paragraph.i === 0 ? { i: 0, t: 'He went home.' } : paragraph,
+          ),
+        }),
+      };
+    });
+
+    const { sidecar, changedCount } = await run();
+
+    expect(changedCount).toBe(1);
+    expect(sidecar.paragraphs[0].cleaned).toBe('He went home.');
+  });
+
+  it('asks the provider for the cleanup schema', async () => {
+    respondWith(paragraphs => paragraphs);
+
+    await run();
+
+    expect(mockedRequest.mock.calls[0][0].schema?.name).toBe(
+      'cleaned_paragraphs',
+    );
+  });
+
   it('retries a batch whose paragraph count does not match', async () => {
     let attempt = 0;
     mockedRequest.mockImplementation(async () => {
@@ -76,6 +127,32 @@ describe('cleanChapterHtml', () => {
 
     expect(attempt).toBe(2);
     expect(sidecar.paragraphs.map(paragraph => paragraph.index)).toEqual([0]);
+  });
+
+  it('retries a batch that came back as unparseable JSON', async () => {
+    let attempt = 0;
+    mockedRequest.mockImplementation(async request => {
+      attempt++;
+      if (attempt === 1) {
+        return { text: '[{"i":0,"t":""Run!""' };
+      }
+      const prompt = request.messages[request.messages.length - 1].content;
+      const payload = JSON.parse(
+        prompt.slice(prompt.indexOf('['), prompt.lastIndexOf(']') + 1),
+      ) as { i: number; t: string }[];
+      return {
+        text: JSON.stringify(
+          payload.map(paragraph =>
+            paragraph.i === 0 ? { i: 0, t: 'He went home.' } : paragraph,
+          ),
+        ),
+      };
+    });
+
+    const { changedCount } = await run();
+
+    expect(attempt).toBe(2);
+    expect(changedCount).toBe(1);
   });
 
   it('falls back to single paragraphs when a batch keeps coming back wrong', async () => {
