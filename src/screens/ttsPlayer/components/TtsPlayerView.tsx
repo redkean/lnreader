@@ -2,12 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { IconButton } from 'react-native-paper';
 
-import { Appbar, Button, SafeAreaView, Slider } from '@components';
+import { Appbar, Menu, SafeAreaView, Slider } from '@components';
 import { useTtsPlayerContext } from '@components/Context/TtsPlayerContext';
 import { useTheme } from '@hooks/persisted';
 import { getString } from '@i18n/translations';
 
 const SLEEP_TIMER_OPTIONS = [15, 30, 45, 60];
+
+/**
+ * The paragraph card is sized for this many lines and never grows or shrinks,
+ * so the transport controls below it hold still while playback moves from a
+ * one-line paragraph to a long one.
+ */
+const PARAGRAPH_LINES = 6;
+const PARAGRAPH_LINE_HEIGHT = 22;
+const PARAGRAPH_PADDING = 16;
 
 const formatRemaining = (endsAt: number, now: number): string => {
   const totalSeconds = Math.max(Math.round((endsAt - now) / 1000), 0);
@@ -50,6 +59,7 @@ const TtsPlayerView = ({ onClose }: TtsPlayerViewProps) => {
   } = useTtsPlayerContext();
 
   const [now, setNow] = useState(() => Date.now());
+  const [timerMenuVisible, setTimerMenuVisible] = useState(false);
 
   useEffect(() => {
     if (sleepTimerEndsAt === null) {
@@ -73,6 +83,11 @@ const TtsPlayerView = ({ onClose }: TtsPlayerViewProps) => {
 
   const isPlaying = state === 'playing';
 
+  const pickSleepTimer = (minutes: number | null) => {
+    setTimerMenuVisible(false);
+    setSleepTimer(minutes);
+  };
+
   return (
     <SafeAreaView excludeTop style={{ backgroundColor: theme.background }}>
       <Appbar
@@ -87,135 +102,171 @@ const TtsPlayerView = ({ onClose }: TtsPlayerViewProps) => {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          {novel?.cover ? (
-            <Image
-              source={{ uri: novel.cover }}
-              style={styles.cover}
-              resizeMode="cover"
-            />
-          ) : null}
-
-          <Text
-            style={[styles.novelName, { color: theme.onSurface }]}
-            numberOfLines={2}
+        <View style={styles.body}>
+          <ScrollView
+            contentContainerStyle={styles.trackContent}
+            style={styles.track}
           >
-            {novel?.name}
-          </Text>
-          <Text
-            style={[styles.chapterName, { color: theme.onSurfaceVariant }]}
-            numberOfLines={2}
-          >
-            {chapter?.name}
-          </Text>
-
-          <View
-            style={[
-              styles.paragraphCard,
-              { backgroundColor: theme.surfaceVariant },
-            ]}
-          >
-            <Text
-              style={[styles.paragraph, { color: theme.onSurfaceVariant }]}
-              numberOfLines={6}
-            >
-              {currentParagraph}
-            </Text>
-          </View>
-
-          <Slider
-            value={progress.index}
-            min={0}
-            max={Math.max(progress.total - 1, 0)}
-            step={1}
-            onSlidingComplete={seekTo}
-          />
-          <Text style={[styles.counter, { color: theme.onSurfaceVariant }]}>
-            {`${Math.min(progress.index + 1, progress.total)} / ${
-              progress.total
-            }`}
-          </Text>
-
-          <View style={styles.transport}>
-            <IconButton
-              icon="skip-backward"
-              iconColor={theme.onSurface}
-              onPress={() => skipChapter('PREV')}
-              accessibilityLabel={getString('ttsPlayer.previousChapter')}
-            />
-            <IconButton
-              icon="skip-previous"
-              iconColor={theme.onSurface}
-              onPress={skipPrevious}
-              accessibilityLabel={getString('ttsPlayer.previousParagraph')}
-            />
-            <IconButton
-              icon={isPlaying ? 'pause-circle' : 'play-circle'}
-              size={64}
-              iconColor={theme.primary}
-              disabled={state === 'loading'}
-              onPress={isPlaying ? pause : play}
-              accessibilityLabel={getString(
-                isPlaying ? 'ttsPlayer.pause' : 'ttsPlayer.play',
-              )}
-            />
-            <IconButton
-              icon="skip-next"
-              iconColor={theme.onSurface}
-              onPress={skipNext}
-              accessibilityLabel={getString('ttsPlayer.nextParagraph')}
-            />
-            <IconButton
-              icon="skip-forward"
-              iconColor={theme.onSurface}
-              onPress={() => skipChapter('NEXT')}
-              accessibilityLabel={getString('ttsPlayer.nextChapter')}
-            />
-          </View>
-
-          <View style={styles.secondaryRow}>
-            <IconButton
-              icon="replay"
-              iconColor={theme.onSurfaceVariant}
-              onPress={replay}
-              accessibilityLabel={getString('ttsPlayer.replayParagraph')}
-            />
-            <IconButton
-              icon="stop"
-              iconColor={theme.onSurfaceVariant}
-              onPress={stop}
-              accessibilityLabel={getString('ttsPlayer.stop')}
-            />
-          </View>
-
-          <Text style={[styles.sectionTitle, { color: theme.onSurface }]}>
-            {getString('ttsPlayer.sleepTimer')}
-          </Text>
-          <View style={styles.timerRow}>
-            <Button
-              title={getString('ttsPlayer.sleepTimerOff')}
-              mode={sleepTimerEndsAt === null ? 'contained' : 'outlined'}
-              onPress={() => setSleepTimer(null)}
-            />
-            {SLEEP_TIMER_OPTIONS.map(minutes => (
-              <Button
-                key={minutes}
-                title={getString('ttsPlayer.minutes', { minutes })}
-                mode="outlined"
-                onPress={() => setSleepTimer(minutes)}
+            {novel?.cover ? (
+              <Image
+                source={{ uri: novel.cover }}
+                style={styles.cover}
+                resizeMode="cover"
               />
-            ))}
-          </View>
-          {remaining ? (
-            <Text style={[styles.counter, { color: theme.onSurfaceVariant }]}>
-              {getString('ttsPlayer.sleepingIn', { time: remaining })}
-            </Text>
-          ) : null}
+            ) : null}
 
-          {error ? (
-            <Text style={[styles.error, { color: theme.error }]}>{error}</Text>
-          ) : null}
-        </ScrollView>
+            <Text
+              style={[styles.novelName, { color: theme.onSurface }]}
+              numberOfLines={2}
+            >
+              {novel?.name}
+            </Text>
+            <Text
+              style={[styles.chapterName, { color: theme.onSurfaceVariant }]}
+              numberOfLines={2}
+            >
+              {chapter?.name}
+            </Text>
+
+            <View
+              style={[
+                styles.paragraphCard,
+                { backgroundColor: theme.surfaceVariant },
+              ]}
+            >
+              <Text
+                style={[styles.paragraph, { color: theme.onSurfaceVariant }]}
+                numberOfLines={PARAGRAPH_LINES}
+              >
+                {currentParagraph}
+              </Text>
+            </View>
+
+            {error ? (
+              <Text style={[styles.error, { color: theme.error }]}>
+                {error}
+              </Text>
+            ) : null}
+          </ScrollView>
+
+          {/* Pinned: nothing above it may change this block's height. */}
+          <View style={styles.controls}>
+            <Slider
+              value={progress.index}
+              min={0}
+              max={Math.max(progress.total - 1, 0)}
+              step={1}
+              onSlidingComplete={seekTo}
+            />
+            <View style={styles.statusRow}>
+              <Text
+                style={[styles.counter, { color: theme.onSurfaceVariant }]}
+                numberOfLines={1}
+              >
+                {`${Math.min(progress.index + 1, progress.total)} / ${
+                  progress.total
+                }`}
+              </Text>
+              <Text
+                style={[styles.counter, { color: theme.onSurfaceVariant }]}
+                numberOfLines={1}
+              >
+                {remaining
+                  ? getString('ttsPlayer.sleepingIn', { time: remaining })
+                  : ''}
+              </Text>
+            </View>
+
+            <View style={styles.transport}>
+              <IconButton
+                icon="skip-backward"
+                iconColor={theme.onSurface}
+                onPress={() => skipChapter('PREV')}
+                accessibilityLabel={getString('ttsPlayer.previousChapter')}
+              />
+              <IconButton
+                icon="skip-previous"
+                iconColor={theme.onSurface}
+                onPress={skipPrevious}
+                accessibilityLabel={getString('ttsPlayer.previousParagraph')}
+              />
+              <IconButton
+                icon={isPlaying ? 'pause-circle' : 'play-circle'}
+                size={64}
+                iconColor={theme.primary}
+                disabled={state === 'loading'}
+                onPress={isPlaying ? pause : play}
+                accessibilityLabel={getString(
+                  isPlaying ? 'ttsPlayer.pause' : 'ttsPlayer.play',
+                )}
+              />
+              <IconButton
+                icon="skip-next"
+                iconColor={theme.onSurface}
+                onPress={skipNext}
+                accessibilityLabel={getString('ttsPlayer.nextParagraph')}
+              />
+              <IconButton
+                icon="skip-forward"
+                iconColor={theme.onSurface}
+                onPress={() => skipChapter('NEXT')}
+                accessibilityLabel={getString('ttsPlayer.nextChapter')}
+              />
+            </View>
+
+            <View style={styles.secondaryRow}>
+              <IconButton
+                icon="replay"
+                iconColor={theme.onSurfaceVariant}
+                onPress={replay}
+                accessibilityLabel={getString('ttsPlayer.replayParagraph')}
+              />
+              <IconButton
+                icon="stop"
+                iconColor={theme.onSurfaceVariant}
+                onPress={stop}
+                accessibilityLabel={getString('ttsPlayer.stop')}
+              />
+              {/* The timer lives in a menu so its options never push the
+                  transport controls around. */}
+              <Menu
+                visible={timerMenuVisible}
+                onDismiss={() => setTimerMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon={
+                      sleepTimerEndsAt === null ? 'timer-outline' : 'timer-sand'
+                    }
+                    iconColor={
+                      sleepTimerEndsAt === null
+                        ? theme.onSurfaceVariant
+                        : theme.primary
+                    }
+                    onPress={() => setTimerMenuVisible(true)}
+                    accessibilityLabel={getString('ttsPlayer.sleepTimer')}
+                  />
+                }
+              >
+                <Menu.Item
+                  title={getString('ttsPlayer.sleepTimerOff')}
+                  onPress={() => pickSleepTimer(null)}
+                  titleStyle={
+                    sleepTimerEndsAt === null
+                      ? { color: theme.primary }
+                      : undefined
+                  }
+                />
+                {SLEEP_TIMER_OPTIONS.map(minutes => (
+                  <Menu.Item
+                    key={minutes}
+                    title={getString('ttsPlayer.minutes', { minutes })}
+                    onPress={() => pickSleepTimer(minutes)}
+                  />
+                ))}
+              </Menu>
+            </View>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -224,19 +275,21 @@ const TtsPlayerView = ({ onClose }: TtsPlayerViewProps) => {
 export default TtsPlayerView;
 
 const styles = StyleSheet.create({
+  body: {
+    flex: 1,
+  },
   chapterName: {
     fontSize: 14,
     marginTop: 4,
     textAlign: 'center',
   },
-  content: {
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 32,
+  controls: {
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   counter: {
     fontSize: 12,
-    marginTop: 4,
   },
   cover: {
     borderRadius: 8,
@@ -266,35 +319,40 @@ const styles = StyleSheet.create({
   },
   paragraph: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: PARAGRAPH_LINE_HEIGHT,
   },
   paragraphCard: {
     borderRadius: 12,
+    height: PARAGRAPH_LINES * PARAGRAPH_LINE_HEIGHT + PARAGRAPH_PADDING * 2,
     marginTop: 20,
-    padding: 16,
+    padding: PARAGRAPH_PADDING,
     width: '100%',
   },
   secondaryRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  sectionTitle: {
-    alignSelf: 'flex-start',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 16,
-  },
-  timerRow: {
+  statusRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    height: 20,
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  track: {
+    flex: 1,
+  },
+  trackContent: {
+    alignItems: 'center',
+    flexGrow: 1,
     justifyContent: 'center',
-    marginTop: 12,
+    padding: 16,
   },
   transport: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 8,
   },
 });

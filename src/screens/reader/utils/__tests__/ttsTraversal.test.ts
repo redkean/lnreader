@@ -115,6 +115,14 @@ describe('reader TTS traversal', () => {
         expect(tts.normalizeText(input)).toBe(input);
       },
     );
+
+    it.each([
+      'He paid 1,300 gold.',
+      'Pi is 3.14 exactly.',
+      'They met at 10:30 sharp.',
+    ])('keeps numbers intact in %s', input => {
+      expect(tts.normalizeText(input)).toBe(input);
+    });
   });
 
   it('queues paragraphs wrapped in spans only once', () => {

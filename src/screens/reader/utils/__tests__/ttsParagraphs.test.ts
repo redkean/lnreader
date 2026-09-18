@@ -106,6 +106,10 @@ const fixtures: [name: string, html: string][] = [
     '<h2>Chapter one</h2><blockquote>Quoted.</blockquote>',
   ],
   ['links inside prose', '<p>See <a href="#">this link</a> for details.</p>'],
+  [
+    'grouped and decimal numbers',
+    '<p>He paid 1,300 gold for 3.14 litres at 10:30.</p>',
+  ],
 ];
 
 describe('ttsParagraphs', () => {
@@ -126,6 +130,22 @@ describe('ttsParagraphs', () => {
 
     it.each(['---', '————', '— — —'])('skips dash divider %s', input => {
       expect(normalizeText(input)).toBe('');
+    });
+
+    it.each([
+      ['He paid 1,300 gold.', 'He paid 1,300 gold.'],
+      ['It cost 1,234,567 coins.', 'It cost 1,234,567 coins.'],
+      ['Pi is 3.14 exactly.', 'Pi is 3.14 exactly.'],
+      ['They met at 10:30 sharp.', 'They met at 10:30 sharp.'],
+    ])('keeps numbers intact in %s', (input, expected) => {
+      expect(normalizeText(input)).toBe(expected);
+    });
+
+    it.each([
+      ['He was 12.Then he left.', 'He was 12. Then he left.'],
+      ['Wait,1,300 of them?', 'Wait, 1,300 of them?'],
+    ])('still spaces sentence punctuation in %s', (input, expected) => {
+      expect(normalizeText(input)).toBe(expected);
     });
   });
 
@@ -151,6 +171,18 @@ describe('ttsParagraphs', () => {
           '<p style="display:none">Hidden.</p><p>Visible.</p>',
         ),
       ).toEqual(['Visible.']);
+    });
+
+    it('speaks cleaned paragraphs by their readable-node index', () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>he go home</p><p><br></p><p>she was happy</p>',
+          new Map([
+            [0, 'He went home.'],
+            [2, 'She was happy.'],
+          ]),
+        ),
+      ).toEqual(['He went home.', 'She was happy.']);
     });
   });
 });

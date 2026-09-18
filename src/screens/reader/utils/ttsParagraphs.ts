@@ -275,16 +275,38 @@ export const renderText = (node: TtsNode): string => {
 
 const DASH_ONLY = /^[\-‐‑‒–—―−⁓⸺⸻﹘﹣－]+$/u;
 
+/** Marks that a number can carry: "1,300", "3.14", "10:30". */
+const NUMERIC_MARK = /[.,:]/;
+
+/**
+ * Gives sentence punctuation a trailing space so the engine breathes between
+ * clauses, while leaving punctuation that sits between digits alone: spacing
+ * "1,300" out to "1, 300" makes it read as "one, three hundred".
+ */
+const spacePunctuation = (value: string): string =>
+  value.replace(
+    /\s*([.,!?;:])\s*/g,
+    (match: string, mark: string, offset: number, source: string) => {
+      const before = source[offset - 1] ?? '';
+      const after = source[offset + match.length] ?? '';
+      if (NUMERIC_MARK.test(mark) && /\d/.test(before) && /\d/.test(after)) {
+        return mark;
+      }
+
+      return `${mark} `;
+    },
+  );
+
 export const normalizeText = (value: string): string => {
   if (!value) {
     return '';
   }
-  const normalized = value
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-    .replace(/\s*([.,!?;:])\s*/g, '$1 ')
-    .trim();
+  const normalized = spacePunctuation(
+    value
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, ''),
+  ).trim();
 
   const dashOnly = normalized.replace(/\s/g, '');
   if (dashOnly.length >= 3 && DASH_ONLY.test(dashOnly)) {
@@ -298,8 +320,18 @@ export const normalizeText = (value: string): string => {
  * Builds the speech queue for a chapter without a WebView, so playback can
  * cross a chapter boundary while the screen is off and the reader's renderer
  * is suspended.
+ *
+ * `cleaned` holds AI-cleaned paragraphs keyed by their position in the
+ * readable-node list - the same index cleanup and the reader address them by -
+ * so the queue speaks what the reader shows. Blank nodes keep their place
+ * while the map is applied and drop out afterwards, exactly as before.
  */
-export const extractTtsParagraphs = (html: string): string[] =>
+export const extractTtsParagraphs = (
+  html: string,
+  cleaned?: ReadonlyMap<number, string>,
+): string[] =>
   getAllReadableNodes(parseChapterNodes(html))
-    .map(node => normalizeText(renderText(node)))
+    .map((node, index) =>
+      normalizeText(cleaned?.get(index) ?? renderText(node)),
+    )
     .filter(Boolean);

@@ -209,14 +209,28 @@ window.tts = new (function () {
     return true;
   };
 
+  // Gives sentence punctuation a trailing space so the engine breathes between
+  // clauses, while leaving punctuation that sits between digits alone: spacing
+  // "1,300" out to "1, 300" makes it read as "one, three hundred".
+  this.spacePunctuation = text =>
+    text.replace(/\s*([.,!?;:])\s*/g, (match, mark, offset, source) => {
+      const before = source[offset - 1] ?? '';
+      const after = source[offset + match.length] ?? '';
+      if (/[.,:]/.test(mark) && /\d/.test(before) && /\d/.test(after)) {
+        return mark;
+      }
+
+      return mark + ' ';
+    });
+
   this.normalizeText = text => {
     if (!text) return '';
-    const normalized = text
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-      .replace(/\s*([.,!?;:])\s*/g, '$1 ')
-      .trim();
+    const normalized = this.spacePunctuation(
+      text
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^["'“”‘’]+|["'“”‘’]+$/g, ''),
+    ).trim();
 
     const dashOnlyText = normalized.replace(/\s/g, '');
     if (

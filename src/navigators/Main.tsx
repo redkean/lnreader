@@ -147,7 +147,14 @@ const MainNavigator = () => {
                 component={GlobalSearchScreen}
               />
               <Stack.Screen name="Migration" component={Migration} />
-              <Stack.Screen name="TtsPlayer" component={TtsPlayerScreen} />
+              <Stack.Screen
+                name="TtsPlayer"
+                component={TtsPlayerScreen}
+                // The player is a sheet-like destination, so it rises over
+                // whatever launched it instead of cutting in like the rest
+                // of the stack.
+                options={{ animation: 'slide_from_bottom' }}
+              />
               <Stack.Screen name="SourceNovels" component={SourceNovels} />
               <Stack.Screen name="MigrateNovel" component={MigrateNovel} />
               <Stack.Screen name="WebviewScreen" component={WebviewScreen} />

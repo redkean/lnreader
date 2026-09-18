@@ -24,10 +24,20 @@ import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/typ
 import { useBackHandler } from '@hooks/index';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Keyboard, Share, StyleSheet, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+} from 'react-native-reanimated';
 import { Drawer } from 'react-native-drawer-layout';
 import { EMPTY_READER_SEARCH_RESULT, ReaderSearchResult } from './types';
 import * as Linking from 'expo-linking';
 import { resolveUrl } from '@services/plugin/fetch';
+
+/** The player slides up over the reader rather than snapping into place. */
+const PLAYER_ENTER_DURATION = 280;
+const PLAYER_EXIT_DURATION = 220;
 
 const Chapter = ({ route, navigation }: ChapterScreenProps) => {
   const [open, setOpen] = useState(false);
@@ -100,7 +110,12 @@ export const ChapterContent = ({
     refetch,
   } = useChapterContext();
   const hidden = useReaderChromeHidden();
-  const { chapter: ttsChapter, playChapter } = useTtsPlayerContext();
+  const {
+    chapter: ttsChapter,
+    isActive: ttsActive,
+    playChapter,
+    state: ttsState,
+  } = useTtsPlayerContext();
   const readerSheetRef = useRef<BottomSheetModalMethods>(null);
   const theme = useTheme();
   const { pageReader = false, keepScreenOn } = useChapterGeneralSettings();
@@ -233,6 +248,25 @@ export const ChapterContent = ({
 
   const closeTtsPlayer = useCallback(() => setTtsPlayerVisible(false), []);
 
+  /**
+   * Playback can start without the player button (the in-page TTS controller,
+   * a paragraph drop), and the reader is not the right screen to be looking at
+   * once it does. Keying off playback rather than off the queue also covers
+   * resuming a chapter the player already owns, while staying true across
+   * paragraph and chapter boundaries so a player the reader closed mid-chapter
+   * does not spring back.
+   */
+  const ttsPlaying =
+    ttsActive && (ttsState === 'playing' || ttsState === 'loading');
+  const ttsWasPlayingRef = useRef(ttsPlaying);
+  useEffect(() => {
+    const wasPlaying = ttsWasPlayingRef.current;
+    ttsWasPlayingRef.current = ttsPlaying;
+    if (ttsPlaying && !wasPlaying) {
+      setTtsPlayerVisible(true);
+    }
+  }, [ttsPlaying]);
+
   const openDrawerI = useCallback(() => {
     openDrawer();
     hideHeader();
@@ -310,9 +344,19 @@ export const ChapterContent = ({
       ) : null}
       <AIDialogs />
       {ttsPlayerVisible ? (
-        <View style={styles.ttsPlayer}>
-          <TtsPlayerView onClose={closeTtsPlayer} />
-        </View>
+        <Animated.View
+          entering={SlideInDown.duration(PLAYER_ENTER_DURATION)}
+          exiting={SlideOutDown.duration(PLAYER_EXIT_DURATION)}
+          style={styles.ttsPlayer}
+        >
+          <Animated.View
+            entering={FadeIn.duration(PLAYER_ENTER_DURATION)}
+            exiting={FadeOut.duration(PLAYER_EXIT_DURATION)}
+            style={styles.ttsPlayerContent}
+          >
+            <TtsPlayerView onClose={closeTtsPlayer} />
+          </Animated.View>
+        </Animated.View>
       ) : null}
       {!hidden && !ttsPlayerVisible ? (
         <>
@@ -358,5 +402,8 @@ const styles = StyleSheet.create({
     start: 0,
     top: 0,
     zIndex: 2,
+  },
+  ttsPlayerContent: {
+    flex: 1,
   },
 });
