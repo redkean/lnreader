@@ -75,11 +75,16 @@ const isRegexString = (input: string): RegExpMatchArray | null =>
   input.match(/^\/(.*)\/([gmiyuvsd]*)$/);
 
 /**
- * Apply all remove-text and replace-text entries to `html`.
+ * Apply the `/pattern/flags` remove-text and replace-text entries to `html`.
  *
- * Each entry in `removeText` or a key in `replaceText` can be:
- * - a literal string (simple split/join)
- * - a `/pattern/flags` regex string
+ * Literal entries are deliberately left alone here. A literal rule is text the
+ * reader selected off the page, so it holds rendered text - no tags, entities
+ * already decoded, whitespace collapsed - and matching it against markup misses
+ * whenever the two differ, which is most chapters: bionic reading wraps the
+ * first half of every word in `<b>`, AI cleanup wraps its edits in `<mark>`,
+ * and the source indents its paragraphs across newlines. Those rules are
+ * applied inside the reader instead, against the text itself, by
+ * `assets/reader/js/textRules.js`.
  */
 export const applyTextModifications = (
   html: string,
@@ -92,8 +97,6 @@ export const applyTextModifications = (
     const m = isRegexString(text);
     if (m) {
       result = safeApplyRegex(m, result);
-    } else {
-      result = result.split(text).join('');
     }
   }
 
@@ -102,8 +105,6 @@ export const applyTextModifications = (
     const m = isRegexString(text);
     if (m) {
       result = safeApplyRegex(m, result, replacement);
-    } else {
-      result = result.split(text).join(replacement);
     }
   }
 

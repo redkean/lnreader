@@ -463,6 +463,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
               <script src="${assetsUriPrefix}/js/core.js"></script>
               <script src="${assetsUriPrefix}/js/search.js"></script>
               <script src="${assetsUriPrefix}/js/index.js"></script>
+              <script src="${assetsUriPrefix}/js/textRules.js"></script>
               <script src="${assetsUriPrefix}/js/textRemover.js"></script>
               <script src="${assetsUriPrefix}/js/aiCleanup.js"></script>
               <script src="${pluginCustomJS}"></script>

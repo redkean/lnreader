@@ -229,47 +229,101 @@ window.textRemover = new (function () {
   });
 })();
 
-/**
- * Directly remove text from the chapter DOM without reloading the WebView.
- * Also updates reader.rawHTML so the text-options deriver (bionic reading,
- * paragraph spacing) doesn't re-introduce removed text on its next run.
- */
-window.textRemover.performRemove = function (text) {
-  const el = document.querySelector('#LNReader-chapter');
-  if (!el) return;
-  const m = text.match(/^\/(.*)\/([gmiyuvsd]*)$/);
-  let result;
-  if (m) {
-    try {
-      result = el.innerHTML.replace(new RegExp(m[1], m[2]), '');
-    } catch (_e) {
-      return;
-    }
-  } else {
-    result = el.innerHTML.split(text).join('');
+/** A rule written as `/pattern/flags` is matched against the markup. */
+const REGEX_RULE = /^\/(.*)\/([gmiyuvsd]*)$/;
+
+const applyRegexToHtml = (html, match, replacement) => {
+  try {
+    return html.replace(new RegExp(match[1], match[2]), replacement);
+  } catch (_e) {
+    return html;
   }
-  el.innerHTML = result;
-  reader.rawHTML = result;
 };
 
 /**
- * Directly replace text in the chapter DOM without reloading the WebView.
- * Also updates reader.rawHTML so the text-options deriver stays in sync.
+ * Applies remove/replace rules to the chapter on screen without reloading the
+ * WebView, and to `reader.rawHTML` alongside it - the text options (bionic
+ * reading, paragraph spacing) rebuild the chapter from that copy, and would
+ * otherwise put the removed text back on their next run.
+ *
+ * Plain rules are matched against the text by `textRules`, because that is
+ * what they are: text the reader selected off the page, which almost never
+ * appears verbatim in the markup. A `/regex/flags` rule is matched against the
+ * markup, which is what the custom-code settings page documents it as.
  */
-window.textRemover.performReplace = function (from, to) {
-  const el = document.querySelector('#LNReader-chapter');
-  if (!el) return;
-  const m = from.match(/^\/(.*)\/([gmiyuvsd]*)$/);
-  let result;
-  if (m) {
-    try {
-      result = el.innerHTML.replace(new RegExp(m[1], m[2]), to);
-    } catch (_e) {
-      return;
-    }
-  } else {
-    result = el.innerHTML.split(from).join(to);
+window.textRemover.applyRules = function (rules) {
+  const element = document.querySelector('#LNReader-chapter');
+  if (!element || !rules || !rules.length) {
+    return;
   }
-  el.innerHTML = result;
-  reader.rawHTML = result;
+
+  const plain = [];
+  let changed = false;
+
+  for (const rule of rules) {
+    if (!rule || typeof rule.from !== 'string' || !rule.from) {
+      continue;
+    }
+    const to = typeof rule.to === 'string' ? rule.to : '';
+    const match = REGEX_RULE.exec(rule.from);
+    if (match) {
+      element.innerHTML = applyRegexToHtml(element.innerHTML, match, to);
+      reader.rawHTML = applyRegexToHtml(reader.rawHTML, match, to);
+      changed = true;
+    } else {
+      plain.push({ from: rule.from, to: to });
+    }
+  }
+
+  for (const rule of plain) {
+    if (window.textRules.apply(element, rule.from, rule.to)) {
+      changed = true;
+    }
+  }
+  const raw = window.textRules.applyToHtml(reader.rawHTML, plain);
+  if (raw !== reader.rawHTML) {
+    reader.rawHTML = raw;
+    changed = true;
+  }
+
+  if (!changed) {
+    return;
+  }
+  reader.refresh();
+  if (typeof schedulePageCalculation === 'function') {
+    schedulePageCalculation();
+  }
+  // The markup the cleaned paragraphs were written into may have just been
+  // rewritten under them.
+  window.aiCleanup?.render?.();
 };
+
+window.textRemover.performRemove = function (text) {
+  window.textRemover.applyRules([{ from: text, to: '' }]);
+};
+
+window.textRemover.performReplace = function (from, to) {
+  window.textRemover.applyRules([{ from: from, to: to }]);
+};
+
+/**
+ * The rules saved from earlier chapters. The regex ones were already applied
+ * to the markup this document was delivered with; the plain ones could not be -
+ * they are text, not markup - so they are applied here, once the chapter and
+ * any custom JS have had their say.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+  const settings = (reader.readerSettings && reader.readerSettings.val) || {};
+  const rules = (settings.removeText || [])
+    .filter(text => typeof text === 'string' && !REGEX_RULE.test(text))
+    .map(text => ({ from: text, to: '' }));
+
+  const replaceText = settings.replaceText || {};
+  for (const from of Object.keys(replaceText)) {
+    if (!REGEX_RULE.test(from)) {
+      rules.push({ from: from, to: replaceText[from] });
+    }
+  }
+
+  window.textRemover.applyRules(rules);
+});

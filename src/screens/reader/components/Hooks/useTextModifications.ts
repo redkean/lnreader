@@ -15,10 +15,13 @@ export default function useTextModifications(
   const { setChapterReaderSettings, ...readerSettings } =
     useChapterReaderSettings();
 
-  // html is computed once per chapter at load time, using the current saved
-  // settings. Subsequent dynamic remove/replace actions inject JS directly
-  // into the WebView DOM instead of rebuilding the HTML source (which would
-  // reload the WebView and lose the reading position).
+  // html is computed once per chapter at load time, and carries only the saved
+  // `/regex/` rules: a literal rule is text the reader selected off the page,
+  // which the markup almost never spells the same way, so those are applied
+  // inside the reader against the text itself (assets/reader/js/textRules.js).
+  // Remove/replace actions likewise inject JS into the WebView DOM rather than
+  // rebuilding the HTML source, which would reload the WebView and lose the
+  // reading position.
   const html = useMemo(
     () =>
       applyTextModifications(
@@ -71,7 +74,9 @@ export default function useTextModifications(
     }
     // Directly replace text in the WebView DOM to avoid full re-render
     injectJS(
-      `window.textRemover?.performReplace?.(${JSON.stringify(selectedTextForReplace)}, ${JSON.stringify(replacementText)}); true;`,
+      `window.textRemover?.performReplace?.(${JSON.stringify(
+        selectedTextForReplace,
+      )}, ${JSON.stringify(replacementText)}); true;`,
     );
     setReplaceModalVisible(false);
     return true;
