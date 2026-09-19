@@ -38,16 +38,23 @@ export class UnparseableResponseError extends CleanupResponseError {
   }
 }
 
+type CleanupResult = {
+  text: string;
+  /** The model judged the whole paragraph to be non-story content. */
+  removed: boolean;
+};
+
 /**
  * Enforces the one-paragraph-in, one-paragraph-out contract. Everything
  * downstream - the diff, the reader's paragraph indices, the TTS queue - is
  * anchored to paragraph position, so a batch that merged or split paragraphs
- * is rejected rather than written back misaligned.
+ * is rejected rather than written back misaligned. A paragraph the model drops
+ * keeps its slot and comes back empty rather than missing.
  */
 const parseCleanupBatch = (
   batch: AIParagraph[],
   responseText: string,
-): Map<number, string> => {
+): Map<number, CleanupResult> => {
   let parsed: unknown;
   try {
     parsed = parseJsonResponse<unknown>(responseText);
@@ -70,7 +77,7 @@ const parseCleanupBatch = (
   }
 
   const expected = new Set(batch.map(paragraph => paragraph.index));
-  const result = new Map<number, string>();
+  const result = new Map<number, CleanupResult>();
 
   for (const entry of entries) {
     if (!entry || typeof entry !== 'object') {
@@ -82,7 +89,14 @@ const parseCleanupBatch = (
     if (index === undefined || text === undefined || !expected.has(index)) {
       throw new ParagraphCountMismatchError(batch.length, entries.length);
     }
-    result.set(index, text.trim());
+    const trimmed = text.trim();
+    // A provider without structured output answers the prompt's fields and
+    // may leave `d` off entirely; an empty paragraph is the same verdict as
+    // the flag, so it is read as one rather than written back as a blank line.
+    result.set(index, {
+      text: record.d === true ? '' : trimmed,
+      removed: record.d === true || trimmed.length === 0,
+    });
   }
 
   if (result.size !== batch.length) {
@@ -96,7 +110,7 @@ const sendBatch = async (
   batch: AIParagraph[],
   glossary: AIGlossaryTerm[],
   signal?: AbortSignal,
-): Promise<{ cleaned: Map<number, string>; usage?: AIUsage }> => {
+): Promise<{ cleaned: Map<number, CleanupResult>; usage?: AIUsage }> => {
   const prompt = buildCleanupPrompt(batch, glossary);
   const response = await requestAI({
     messages: [
@@ -126,7 +140,7 @@ const cleanBatch = async (
   glossary: AIGlossaryTerm[],
   usage: { current: AIUsage },
   signal?: AbortSignal,
-): Promise<Map<number, string>> => {
+): Promise<Map<number, CleanupResult>> => {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await sendBatch(batch, glossary, signal);
@@ -144,10 +158,10 @@ const cleanBatch = async (
     return new Map();
   }
 
-  const merged = new Map<number, string>();
+  const merged = new Map<number, CleanupResult>();
   for (const paragraph of batch) {
     const single = await cleanBatch([paragraph], glossary, usage, signal);
-    single.forEach((text, index) => merged.set(index, text));
+    single.forEach((result, index) => merged.set(index, result));
   }
   return merged;
 };
@@ -193,11 +207,16 @@ export const cleanChapterHtml = async (
 
     for (const paragraph of batch) {
       const returned = cleaned.get(paragraph.index);
-      const text =
-        returned === undefined
-          ? undefined
-          : preservePunctuationStyle(paragraph.text, returned);
-      if (text === undefined || text === paragraph.text) {
+      if (returned === undefined) {
+        continue;
+      }
+      // A dropped paragraph is a deletion of the whole thing: the diff below
+      // turns it into one op holding the original, which is what the reader
+      // shows when the caret standing in for it is tapped.
+      const text = returned.removed
+        ? ''
+        : preservePunctuationStyle(paragraph.text, returned.text);
+      if (text === paragraph.text) {
         continue;
       }
       paragraphs.push({
@@ -205,6 +224,7 @@ export const cleanChapterHtml = async (
         original: paragraph.text,
         cleaned: text,
         ops: diffParagraph(paragraph.text, text),
+        ...(returned.removed ? { removed: true } : {}),
       });
     }
 

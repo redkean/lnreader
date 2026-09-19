@@ -99,6 +99,13 @@ export type AICleanedParagraph = {
   original: string;
   cleaned: string;
   ops: AIDiffOp[];
+  /**
+   * Set when the paragraph is not part of the story at all - a translator's
+   * note, an advert, a navigation link. `cleaned` is empty, so the reader
+   * collapses the paragraph away and the TTS queue skips it, while the
+   * original stays in the sidecar and one tap puts it back.
+   */
+  removed?: boolean;
 };
 
 /** The on-disk `cleaned.json` sidecar written next to a downloaded chapter. */

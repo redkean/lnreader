@@ -26,3 +26,29 @@ mark.ai-edit:has(+ mark.ai-edit) {
 body.ai-edits-hidden mark.ai-edit {
   text-decoration: none;
 }
+
+/*
+ * Paragraphs cleanup dropped whole: translator notes, adverts, navigation
+ * links. The paragraph keeps its place in the document - every index the
+ * reader and TTS use is positional - but collapses to a tappable ellipsis so
+ * the reader can see what was cut and put it back. With edit marks hidden it
+ * leaves the page entirely.
+ */
+.ai-cleaned.ai-removed {
+  margin: 0;
+  text-align: center;
+}
+
+.ai-cleaned.ai-removed mark.ai-edit {
+  text-decoration: none;
+  opacity: 0.4;
+}
+
+.ai-cleaned.ai-removed mark.ai-edit::after {
+  content: '···';
+  letter-spacing: 0.2em;
+}
+
+body.ai-edits-hidden .ai-cleaned.ai-removed {
+  display: none;
+}

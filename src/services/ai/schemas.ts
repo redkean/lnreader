@@ -24,8 +24,15 @@ export const CLEANUP_SCHEMA: AIResponseSchema = {
               description: 'The index the paragraph was sent with.',
             },
             t: { type: 'string', description: 'The cleaned paragraph text.' },
+            d: {
+              type: 'boolean',
+              description:
+                'True when the whole paragraph is not part of the story - a ' +
+                'translator note, an advert, a navigation link - and should ' +
+                'be dropped. Then "t" is empty.',
+            },
           },
-          required: ['i', 't'],
+          required: ['i', 't', 'd'],
           additionalProperties: false,
         },
       },

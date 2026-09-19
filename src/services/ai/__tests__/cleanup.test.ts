@@ -55,6 +55,71 @@ describe('cleanChapterHtml', () => {
     expect(sidecar.paragraphs[0].ops.length).toBeGreaterThan(0);
   });
 
+  it('drops a paragraph the model marks as not part of the story', async () => {
+    respondWith(paragraphs =>
+      paragraphs.map(paragraph =>
+        paragraph.i === 2 ? { i: 2, t: '', d: true } : paragraph,
+      ),
+    );
+
+    const { sidecar } = await run();
+
+    expect(sidecar.paragraphs).toHaveLength(1);
+    expect(sidecar.paragraphs[0]).toMatchObject({
+      index: 2,
+      original: 'they is here',
+      cleaned: '',
+      removed: true,
+    });
+    // One op holding the whole paragraph, so the reader can show what was cut.
+    expect(sidecar.paragraphs[0].ops).toEqual([
+      { start: 0, length: 0, original: 'they is here' },
+    ]);
+  });
+
+  it('reads an empty paragraph as a drop even without the flag', async () => {
+    respondWith(paragraphs =>
+      paragraphs.map(paragraph =>
+        paragraph.i === 1 ? { i: 1, t: '' } : paragraph,
+      ),
+    );
+
+    const { sidecar } = await run();
+
+    expect(sidecar.paragraphs).toHaveLength(1);
+    expect(sidecar.paragraphs[0]).toMatchObject({
+      index: 1,
+      cleaned: '',
+      removed: true,
+    });
+  });
+
+  it('ignores the text a drop came back with', async () => {
+    respondWith(paragraphs =>
+      paragraphs.map(paragraph =>
+        paragraph.i === 0
+          ? { i: 0, t: 'Translator: report typos below!', d: true }
+          : paragraph,
+      ),
+    );
+
+    const { sidecar } = await run();
+
+    expect(sidecar.paragraphs).toHaveLength(1);
+    expect(sidecar.paragraphs[0].cleaned).toBe('');
+  });
+
+  it('leaves a paragraph alone when the drop flag is false', async () => {
+    respondWith(paragraphs =>
+      paragraphs.map(paragraph => ({ ...paragraph, d: false })),
+    );
+
+    const { sidecar, changedCount } = await run();
+
+    expect(changedCount).toBe(0);
+    expect(sidecar.paragraphs).toHaveLength(0);
+  });
+
   it('ignores a paragraph the model only restyled', async () => {
     respondWith(paragraphs =>
       paragraphs.map(paragraph => ({

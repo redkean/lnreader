@@ -115,6 +115,11 @@ window.aiCleanup = new (function () {
     element.innerHTML = element.dataset.aiOriginalHtml;
     innermostWrapper(element).innerHTML = buildHtml(entry, this.showEdits);
     element.classList.add('ai-cleaned');
+    // A paragraph cleanup dropped whole - a translator's note, an advert - has
+    // no text left to lay out. It collapses to the caret that stands in for it
+    // so the reader can tap through to what was cut, and to nothing at all
+    // once edit marks are hidden.
+    element.classList.toggle('ai-removed', entry.removed === true);
     return true;
   };
 
@@ -125,6 +130,7 @@ window.aiCleanup = new (function () {
     }
     element.innerHTML = element.dataset.aiOriginalHtml;
     element.classList.remove('ai-cleaned');
+    element.classList.remove('ai-removed');
   };
 
   this.render = () => {
@@ -221,7 +227,9 @@ window.aiCleanup = new (function () {
         data: {
           index: index,
           original: mark.dataset.aiOriginal || '',
-          cleaned: mark.textContent || '',
+          // The caret marking a deletion is a zero-width space; the dialog
+          // wants an empty string so it says the text was removed.
+          cleaned: (mark.textContent || '').replace(/\u200b/g, ''),
         },
       });
     },

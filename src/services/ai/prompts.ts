@@ -20,8 +20,21 @@ Fix only what is broken:
 - punctuation and spacing that is missing or in the wrong place
 - inconsistent spelling of names and terms
 
+Also drop content that is not part of the story:
+- translator, editor or uploader notes, including requests to report typos or
+  errors, and apologies for the translation
+- advertising, donation, subscription and Patreon plugs
+- "read the rest at ...", site names, watermarks and credit lines
+- navigation furniture: previous chapter, next chapter, table of contents
+A paragraph that is nothing but such content: return "d": true and "t": "".
+A paragraph of story prose with such content attached to it: return
+"d": false and "t" holding the prose alone, with those sentences dropped.
+Never drop story prose, the chapter's title, or an author's note that reads as
+part of the work.
+
 Never do any of these:
-- do not summarise, shorten, expand, or add anything that was not there
+- do not summarise, shorten, expand, or add to the story itself; the only
+  text you ever remove is the non-story content listed above
 - do not change what happens, who says it, or the order events are told in
 - do not alter the narrative voice, tone, or tense of the original
 - do not translate or localise honorifics and terms of address; keep them as written
@@ -32,8 +45,9 @@ Never do any of these:
 You will receive a JSON array of paragraph objects. Return
 {"paragraphs": [...]} holding exactly the same number of objects, in the same
 order, with the same "i" values. Each object is {"i": <number>,
-"t": "<cleaned paragraph>"}. If a paragraph needs no change, return it
-unchanged. Dialogue is quoted prose, so every quote mark inside "t" must be
+"t": "<cleaned paragraph>", "d": <true only when the whole paragraph is not
+part of the story>}. If a paragraph needs no change, return it unchanged with
+"d": false. Dialogue is quoted prose, so every quote mark inside "t" must be
 escaped as \\" - the response has to parse as JSON. Return the JSON object and
 nothing else.`;
 

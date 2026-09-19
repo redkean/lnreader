@@ -303,6 +303,10 @@ export const normalizeText = (value: string): string => {
   }
   const normalized = spacePunctuation(
     value
+      // Zero-width characters carry no speech and the reader cannot see them,
+      // but they keep a paragraph out of the queue's empty filter - the caret
+      // standing in for a dropped paragraph is one.
+      .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/^["'“”‘’]+|["'“”‘’]+$/g, ''),
