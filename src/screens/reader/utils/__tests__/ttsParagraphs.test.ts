@@ -178,11 +178,88 @@ describe('ttsParagraphs', () => {
         extractTtsParagraphs(
           '<p>he go home</p><p><br></p><p>she was happy</p>',
           new Map([
-            [0, 'He went home.'],
-            [2, 'She was happy.'],
+            [0, { original: 'he go home', cleaned: 'He went home.' }],
+            [2, { original: 'she was happy', cleaned: 'She was happy.' }],
           ]),
         ),
       ).toEqual(['He went home.', 'She was happy.']);
+    });
+
+    it('speaks the original when a cleaned paragraph no longer lines up', () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>he go home</p><p>she was happy</p>',
+          // The paragraph list drifted: index 1 holds different text now.
+          new Map([
+            [1, { original: 'they is here', cleaned: 'They are here.' }],
+          ]),
+        ),
+      ).toEqual(['he go home', 'she was happy']);
+    });
+
+    it('drops a paragraph a cleanup removed outright', () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>Story.</p><p>If you find any errors, tell us.</p>',
+          new Map([
+            [1, { original: 'If you find any errors, tell us.', cleaned: '' }],
+          ]),
+        ),
+      ).toEqual(['Story.']);
+    });
+
+    it("leaves out what the reader's remove rules take off the page", () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>Story. <b>If</b> you find any <b>err</b>ors, tell us.</p>',
+          undefined,
+          [{ from: 'If you find any errors, tell us.', to: '' }],
+        ),
+      ).toEqual(['Story.']);
+    });
+
+    it('speaks a replace rule the way the page shows it', () => {
+      expect(
+        extractTtsParagraphs('<p>Rin said hello</p>', undefined, [
+          { from: 'Rin', to: 'Lin' },
+        ]),
+      ).toEqual(['Lin said hello']);
+    });
+
+    it('drops a paragraph a rule empties', () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>Read more at foo.net</p><p>Story.</p>',
+          undefined,
+          [{ from: 'Read more at foo.net', to: '' }],
+        ),
+      ).toEqual(['Story.']);
+    });
+
+    it('applies a rule to cleaned text as well', () => {
+      expect(
+        extractTtsParagraphs(
+          '<p>he go home, tell us.</p>',
+          new Map([
+            [
+              0,
+              {
+                original: 'he go home, tell us.',
+                cleaned: 'He went home, tell us.',
+              },
+            ],
+          ]),
+          [{ from: ', tell us.', to: '.' }],
+        ),
+      ).toEqual(['He went home.']);
+    });
+
+    it('never lets a rule match across a line break', () => {
+      expect(
+        extractTtsParagraphs('<p>the end<br>of it</p>', undefined, [
+          { from: 'end of', to: '' },
+        ]),
+      ).toEqual(['the end of it']);
     });
   });
 });

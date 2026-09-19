@@ -21,7 +21,12 @@ import {
   TtsSettings,
 } from '@modules/nitro-tts';
 import { sanitizeChapterText } from '@screens/reader/utils/sanitizeChapterText';
-import { extractTtsParagraphs } from '@screens/reader/utils/ttsParagraphs';
+import {
+  extractTtsParagraphs,
+  type TtsCleanedParagraph,
+} from '@screens/reader/utils/ttsParagraphs';
+import { plainTextRules } from '@screens/reader/utils/textRules';
+import { applyTextModifications } from '@utils/customCode';
 import { toNativeTtsSettings } from '@screens/reader/utils/ttsSettings';
 import { getAISettings } from '@hooks/persisted/useAISettings';
 import { hashChapterText, readCleanupSidecar } from '@services/ai';
@@ -51,7 +56,7 @@ const cleanedParagraphsFor = async (
   novel: NovelInfo,
   chapter: ChapterInfo,
   html: string,
-): Promise<Map<number, string> | undefined> => {
+): Promise<Map<number, TtsCleanedParagraph> | undefined> => {
   const settings = getAISettings();
   if (!settings.enabled || !settings.preferCleaned) {
     return undefined;
@@ -66,10 +71,13 @@ const cleanedParagraphsFor = async (
     return undefined;
   }
   const reverted = new Set(sidecar.reverted);
-  const cleaned = new Map<number, string>();
+  const cleaned = new Map<number, TtsCleanedParagraph>();
   for (const paragraph of sidecar.paragraphs) {
     if (!reverted.has(paragraph.index)) {
-      cleaned.set(paragraph.index, paragraph.cleaned);
+      cleaned.set(paragraph.index, {
+        original: paragraph.original,
+        cleaned: paragraph.cleaned,
+      });
     }
   }
   return cleaned.size ? cleaned : undefined;
@@ -115,6 +123,16 @@ export const useTtsPlayer = () => {
   useEffect(() => {
     settingsRef.current = readerSettings;
   }, [readerSettings]);
+
+  // A queue built before a rule was added still speaks what the rule removes,
+  // and chapters are queued long before they are played.
+  const textRuleKey = JSON.stringify([
+    readerSettings.removeText,
+    readerSettings.replaceText,
+  ]);
+  useEffect(() => {
+    queueCacheRef.current.clear();
+  }, [textRuleKey]);
 
   const incognitoRef = useRef(incognitoMode);
   useEffect(() => {
@@ -193,9 +211,18 @@ export const useTtsPlayer = () => {
           chapter.name,
           text,
         );
+        // The cleanup sidecar is keyed by the hash of the chapter as it was
+        // sanitised, so it is read before the reader's rules touch anything.
+        const cleaned = await cleanedParagraphsFor(novel, chapter, html);
+        // Settings saved before these rules existed have neither key.
+        const removeText = settingsRef.current.removeText ?? [];
+        const replaceText = settingsRef.current.replaceText ?? {};
         return extractTtsParagraphs(
-          html,
-          await cleanedParagraphsFor(novel, chapter, html),
+          // A `/regex/` rule is written against markup, so it is applied to the
+          // markup here too, exactly as the reader applies it on load.
+          applyTextModifications(html, removeText, replaceText),
+          cleaned,
+          plainTextRules(removeText, replaceText),
         );
       })();
 

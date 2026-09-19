@@ -4,6 +4,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import {
+  applyTextRules,
+  isRegexRule,
+  normalizeRule,
+  plainTextRules,
+} from '../textRules';
+
 /**
  * Exercises `assets/reader/js/textRules.js` against a real DOM, because that is
  * the whole point of the file: the rules the reader writes are rendered text,
@@ -139,5 +146,76 @@ describe('textRules.applyToHtml', () => {
       html,
     );
     expect(textRules.applyToHtml(html, [])).toBe(html);
+  });
+});
+
+/**
+ * `textRules.ts` applies the same rules where playback needs them and there is
+ * no DOM: the two normalise a rule identically or a rule that hides a note on
+ * the page would still be spoken.
+ */
+describe('the off-WebView twin', () => {
+  it.each([
+    '  If you find any errors  ',
+    'read\n   more   at\nfoo.net',
+    'Tom\u00a0&\u00a0Jerry',
+    '',
+    '   ',
+  ])('normalizes %j the same way the reader does', value => {
+    expect(normalizeRule(value)).toBe(textRules.normalize(value));
+  });
+
+  it('removes from a paragraph what the reader removes from the page', () => {
+    const rule = { from: 'If you find any errors, tell us.', to: '' };
+    const chapter = chapterWith(
+      '<p>Story. <b>If</b> you find any <b>err</b>ors, tell us.</p>',
+    );
+
+    textRules.apply(chapter, rule.from, rule.to);
+
+    expect(
+      applyTextRules('Story. If you find any errors, tell us.', [rule]),
+    ).toBe(chapter.textContent);
+  });
+
+  it('applies a replacement, and one holding its own rule only once', () => {
+    expect(
+      applyTextRules('Rin said, Rin left', [{ from: 'Rin', to: 'Lin' }]),
+    ).toBe('Lin said, Lin left');
+    expect(applyTextRules('ha', [{ from: 'ha', to: 'haha' }])).toBe('haha');
+  });
+
+  it('holds a rule to one line', () => {
+    expect(applyTextRules('the end\nof it', [{ from: 'end of', to: '' }])).toBe(
+      'the end\nof it',
+    );
+  });
+
+  it('leaves the text alone when there are no rules', () => {
+    expect(applyTextRules('  spacing   kept  ', [])).toBe('  spacing   kept  ');
+  });
+});
+
+describe('plainTextRules', () => {
+  it('keeps the literal rules and leaves the regex ones to the markup', () => {
+    expect(
+      plainTextRules(['a note', '/<p>Ad<\\/p>/g', ''], {
+        'Rin': 'Lin',
+        '/\\d+/g': '#',
+        '': 'x',
+      }),
+    ).toEqual([
+      { from: 'a note', to: '' },
+      { from: 'Rin', to: 'Lin' },
+    ]);
+  });
+
+  it('treats missing settings as no rules', () => {
+    expect(plainTextRules(undefined, undefined)).toEqual([]);
+  });
+
+  it('recognises a regex rule the way the reader does', () => {
+    expect(isRegexRule('/x/g')).toBe(true);
+    expect(isRegexRule('plain')).toBe(false);
   });
 });

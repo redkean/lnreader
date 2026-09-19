@@ -1,3 +1,5 @@
+import { applyTextRules, type TextRule } from './textRules';
+
 /**
  * Node names the reader treats as inline formatting rather than as a
  * standalone paragraph. Kept in sync with `window.tts` in
@@ -320,6 +322,12 @@ export const normalizeText = (value: string): string => {
   return normalized;
 };
 
+/** A cleaned paragraph and the source text it was written against. */
+export type TtsCleanedParagraph = {
+  original: string;
+  cleaned: string;
+};
+
 /**
  * Builds the speech queue for a chapter without a WebView, so playback can
  * cross a chapter boundary while the screen is off and the reader's renderer
@@ -327,15 +335,29 @@ export const normalizeText = (value: string): string => {
  *
  * `cleaned` holds AI-cleaned paragraphs keyed by their position in the
  * readable-node list - the same index cleanup and the reader address them by -
- * so the queue speaks what the reader shows. Blank nodes keep their place
- * while the map is applied and drop out afterwards, exactly as before.
+ * so the queue speaks what the reader shows. Each one is checked against the
+ * text it was cleaned from before it is spoken, the way the reader checks
+ * before swapping it in: a paragraph list that drifted speaks the author's text
+ * rather than cleaned prose from somewhere else in the chapter. Blank nodes
+ * keep their place while the map is applied and drop out afterwards.
+ *
+ * `rules` are the reader's plain remove/replace rules, applied to the text of
+ * each paragraph so the queue leaves out what the page leaves out. A paragraph
+ * a rule empties drops out with the blank ones.
  */
 export const extractTtsParagraphs = (
   html: string,
-  cleaned?: ReadonlyMap<number, string>,
+  cleaned?: ReadonlyMap<number, TtsCleanedParagraph>,
+  rules?: TextRule[],
 ): string[] =>
   getAllReadableNodes(parseChapterNodes(html))
-    .map((node, index) =>
-      normalizeText(cleaned?.get(index) ?? renderText(node)),
-    )
+    .map((node, index) => {
+      const source = renderText(node);
+      const override = cleaned?.get(index);
+      const text =
+        override && normalizeText(override.original) === normalizeText(source)
+          ? override.cleaned
+          : source;
+      return normalizeText(rules?.length ? applyTextRules(text, rules) : text);
+    })
     .filter(Boolean);
