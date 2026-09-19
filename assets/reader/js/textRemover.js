@@ -2,6 +2,13 @@
 window.textRemover = new (function () {
   let selectionUI = null;
   let isUIActive = false;
+  /**
+   * The selection the buttons act on, kept from the last selectionchange.
+   * Tapping a button is a tap outside the selected range, so the WebView has
+   * already collapsed the selection by the time the handler runs - reading the
+   * selection there finds nothing and the action silently does nothing.
+   */
+  let lastSelectedText = '';
 
   function createSelectionUI() {
     if (selectionUI) return selectionUI;
@@ -138,14 +145,19 @@ window.textRemover = new (function () {
     }
 
     ui.style.opacity = '1';
+    ui.style.pointerEvents = 'auto';
     isUIActive = true;
   }
 
   function hideSelectionUI() {
     if (selectionUI) {
       selectionUI.style.opacity = '0';
+      // An invisible bar still takes taps, and this one sits over the middle
+      // of the page.
+      selectionUI.style.pointerEvents = 'none';
     }
     isUIActive = false;
+    lastSelectedText = '';
   }
 
   function getSelectedText() {
@@ -157,7 +169,7 @@ window.textRemover = new (function () {
   }
 
   function removeSelectedText() {
-    const selectedText = getSelectedText();
+    const selectedText = lastSelectedText || getSelectedText();
     if (selectedText) {
       reader.post({
         type: 'text-action',
@@ -169,7 +181,7 @@ window.textRemover = new (function () {
   }
 
   function replaceSelectedText() {
-    const selectedText = getSelectedText();
+    const selectedText = lastSelectedText || getSelectedText();
     if (selectedText) {
       // For replace, we need user input, so send a different message
       reader.post({
@@ -185,6 +197,7 @@ window.textRemover = new (function () {
   document.addEventListener('selectionchange', function () {
     const selectedText = getSelectedText();
     if (selectedText) {
+      lastSelectedText = selectedText;
       showSelectionUI();
     } else if (!isUIActive) {
       hideSelectionUI();
