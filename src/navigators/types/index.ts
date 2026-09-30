@@ -94,6 +94,7 @@ export type SettingsStackParamList = {
   CodeSnippets: { snippetIndex: number; isJS: boolean } | undefined;
   GenreTaxonomy: undefined;
   AISettings: undefined;
+  AIRequestLog: undefined;
 };
 
 export type NovelScreenProps = NativeStackScreenProps<
@@ -209,6 +210,10 @@ export type RespositorySettingsScreenProps = CompositeScreenProps<
 export type AISettingsScreenProps = NativeStackScreenProps<
   SettingsStackParamList,
   'AISettings'
+>;
+export type AIRequestLogScreenProps = NativeStackScreenProps<
+  SettingsStackParamList,
+  'AIRequestLog'
 >;
 export type GlossaryScreenProps = NativeStackScreenProps<
   MoreStackParamList,

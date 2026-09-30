@@ -17,7 +17,6 @@ import {
   upsertGlossaryTerms,
 } from '@database/queries/AIQueries';
 import { getAISettings, useAISettings } from '@hooks/persisted/useAISettings';
-import { showToast } from '@utils/showToast';
 import { runWhenIdle } from '@utils/runWhenIdle';
 import {
   analyzeChapter,
@@ -63,6 +62,7 @@ export default function useChapterAI(
   const [summary, setSummary] = useState<string>();
   const [recap, setRecap] = useState<string>();
   const [editDetail, setEditDetail] = useState<AIEditDetail>();
+  const [error, setError] = useState<string>();
 
   const abortRef = useRef<AbortController | undefined>(undefined);
   const chapterIdRef = useRef(chapter.id);
@@ -79,6 +79,20 @@ export default function useChapterAI(
 
   useEffect(() => cancel, [cancel]);
 
+  /**
+   * Held until dismissed rather than toasted: a provider error is a sentence
+   * or three, and a toast is gone before it can be read. A run the reader
+   * cancelled is not an error worth a dialog.
+   */
+  const reportError = useCallback(
+    (controller: AbortController, failure: unknown) => {
+      if (!controller.signal.aborted) {
+        setError(errorMessage(failure));
+      }
+    },
+    [],
+  );
+
   // Reload everything that is keyed to the chapter's text.
   useEffect(() => {
     chapterIdRef.current = chapter.id;
@@ -86,6 +100,7 @@ export default function useChapterAI(
     setSummary(undefined);
     setRecap(undefined);
     setEditDetail(undefined);
+    setError(undefined);
     setContentHash('');
 
     if (!enabled || !chapterText) {
@@ -167,6 +182,8 @@ export default function useChapterAI(
               : [],
             paragraphsPerBatch: current.paragraphsPerBatch,
             reverted: force ? [] : existing?.reverted,
+            novelName: novel.name,
+            chapterName: chapter.name,
           },
           update =>
             setProgress(
@@ -197,7 +214,7 @@ export default function useChapterAI(
           setShowCleaned(true);
         }
       } catch (error) {
-        showToast(errorMessage(error));
+        reportError(controller, error);
       } finally {
         abortRef.current = undefined;
         setRunning(undefined);
@@ -207,11 +224,14 @@ export default function useChapterAI(
     [
       chapter.chapterNumber,
       chapter.id,
+      chapter.name,
       chapter.novelId,
       chapterText,
       contentHash,
       enabled,
+      novel.name,
       novel.pluginId,
+      reportError,
       running,
     ],
   );
@@ -268,7 +288,7 @@ export default function useChapterAI(
           setSummary(analysis.summary);
         }
       } catch (error) {
-        showToast(errorMessage(error));
+        reportError(controller, error);
       } finally {
         abortRef.current = undefined;
         setRunning(undefined);
@@ -283,6 +303,7 @@ export default function useChapterAI(
       contentHash,
       enabled,
       novel.name,
+      reportError,
       running,
     ],
   );
@@ -309,7 +330,7 @@ export default function useChapterAI(
         setRecap(result.recap);
       }
     } catch (error) {
-      showToast(errorMessage(error));
+      reportError(controller, error);
     } finally {
       abortRef.current = undefined;
       setRunning(undefined);
@@ -320,6 +341,7 @@ export default function useChapterAI(
     chapter.position,
     enabled,
     novel.name,
+    reportError,
     running,
   ]);
 
@@ -344,6 +366,7 @@ export default function useChapterAI(
   const toggleEdits = useCallback(() => setShowEdits(value => !value), []);
   const clearEditDetail = useCallback(() => setEditDetail(undefined), []);
   const clearRecap = useCallback(() => setRecap(undefined), []);
+  const clearError = useCallback(() => setError(undefined), []);
 
   /**
    * Warms the next chapter while this one is being read, so a reader moving
@@ -411,9 +434,11 @@ export default function useChapterAI(
       aiSummary: summary,
       aiRecap: recap,
       aiEditDetail: editDetail,
+      aiError: error,
       aiChangedCount: sidecar?.paragraphs.length ?? 0,
       aiHydrateScriptRef: hydrateScriptRef,
       clearAIEditDetail: clearEditDetail,
+      clearAIError: clearError,
       clearAIRecap: clearRecap,
       cancelAIRun: cancel,
       handleAIMessage,
@@ -428,9 +453,11 @@ export default function useChapterAI(
     [
       cancel,
       clearEditDetail,
+      clearError,
       clearRecap,
       editDetail,
       enabled,
+      error,
       handleAIMessage,
       prefetchChapterAI,
       progress,

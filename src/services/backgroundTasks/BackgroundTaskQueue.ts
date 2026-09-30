@@ -8,6 +8,7 @@ import { showToast } from '@utils/showToast';
 import type {
   BackgroundTask,
   BackgroundTaskMetadata,
+  FailedBackgroundTask,
   QueuedBackgroundTask,
 } from './contracts';
 import { executeBackgroundTask } from './executeTask';
@@ -20,6 +21,9 @@ import {
   willTaskWaitInQueue,
 } from './taskDefinitions';
 import { BACKGROUND_TASKS_STORE_KEY } from './constants';
+
+/** Failed records were never pruned, so an old install can hold many. */
+const MAX_FAILED_TASKS = 50;
 
 const makeTemporaryId = () =>
   `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -56,6 +60,30 @@ export class BackgroundTaskQueue {
       .map(fromNativeTaskRecord);
     this.store(queue);
     return queue;
+  }
+
+  /**
+   * Read from the native store rather than mirrored in MMKV: a task can also
+   * fail natively, without this queue ever seeing it happen.
+   */
+  async getFailedTasks(): Promise<FailedBackgroundTask[]> {
+    const records = await NativeBackgroundTasks.getFailedTasks(
+      MAX_FAILED_TASKS,
+    );
+    return records.map(record => ({
+      id: record.id,
+      name: record.title,
+      error: record.progressText ?? '',
+      failedAt: record.updatedAt,
+    }));
+  }
+
+  dismissFailedTask(taskId: string) {
+    return NativeBackgroundTasks.remove(taskId);
+  }
+
+  clearFailedTasks() {
+    return NativeBackgroundTasks.removeFailed();
   }
 
   enqueue = (tasks: BackgroundTask | BackgroundTask[]) => {

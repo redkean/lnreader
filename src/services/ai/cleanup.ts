@@ -10,11 +10,13 @@ import { buildCleanupPrompt, CLEANUP_SYSTEM_PROMPT } from './prompts';
 import { CLEANUP_SCHEMA } from './schemas';
 import { preservePunctuationStyle } from './punctuation';
 import { estimateTokens } from './cost';
+import { markAIRequestRejected } from './requestLog';
 import type {
   AICleanedParagraph,
   AICleanupSidecar,
   AIGlossaryTerm,
   AIParagraph,
+  AIRequestContext,
   AIUsage,
 } from './types';
 
@@ -110,6 +112,7 @@ const sendBatch = async (
   batch: AIParagraph[],
   glossary: AIGlossaryTerm[],
   signal?: AbortSignal,
+  context?: AIRequestContext,
 ): Promise<{ cleaned: Map<number, CleanupResult>; usage?: AIUsage }> => {
   const prompt = buildCleanupPrompt(batch, glossary);
   const response = await requestAI({
@@ -122,12 +125,18 @@ const sendBatch = async (
     maxOutputTokens: Math.ceil(estimateTokens(prompt) * 1.4) + 600,
     schema: CLEANUP_SCHEMA,
     signal,
+    context,
   });
 
-  return {
-    cleaned: parseCleanupBatch(batch, response.text),
-    usage: response.usage,
-  };
+  try {
+    return {
+      cleaned: parseCleanupBatch(batch, response.text),
+      usage: response.usage,
+    };
+  } catch (error) {
+    markAIRequestRejected(response.logId, error);
+    throw error;
+  }
 };
 
 /**
@@ -140,10 +149,11 @@ const cleanBatch = async (
   glossary: AIGlossaryTerm[],
   usage: { current: AIUsage },
   signal?: AbortSignal,
+  context?: AIRequestContext,
 ): Promise<Map<number, CleanupResult>> => {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const result = await sendBatch(batch, glossary, signal);
+      const result = await sendBatch(batch, glossary, signal, context);
       usage.current = addUsage(usage.current, result.usage);
       return result.cleaned;
     } catch (error) {
@@ -160,7 +170,13 @@ const cleanBatch = async (
 
   const merged = new Map<number, CleanupResult>();
   for (const paragraph of batch) {
-    const single = await cleanBatch([paragraph], glossary, usage, signal);
+    const single = await cleanBatch(
+      [paragraph],
+      glossary,
+      usage,
+      signal,
+      context,
+    );
     single.forEach((result, index) => merged.set(index, result));
   }
   return merged;
@@ -180,6 +196,9 @@ export const cleanChapterHtml = async (
     paragraphsPerBatch: number;
     /** Kept so a re-run kept the reader's per-paragraph reverts. */
     reverted?: number[];
+    /** Names the chapter in the request log. */
+    novelName?: string;
+    chapterName?: string;
   },
   onProgress?: (progress: CleanupProgress) => void,
   signal?: AbortSignal,
@@ -195,6 +214,11 @@ export const cleanChapterHtml = async (
   }
 
   const batches = chunkParagraphs(cleanable, args.paragraphsPerBatch);
+  const context: AIRequestContext = {
+    kind: 'cleanup',
+    novelName: args.novelName,
+    chapterName: args.chapterName,
+  };
   const usage = { current: { inputTokens: 0, outputTokens: 0 } };
   const paragraphs: AICleanedParagraph[] = [];
   let completed = 0;
@@ -203,7 +227,13 @@ export const cleanChapterHtml = async (
     if (signal?.aborted) {
       throw new Error('Cancelled');
     }
-    const cleaned = await cleanBatch(batch, args.glossary, usage, signal);
+    const cleaned = await cleanBatch(
+      batch,
+      args.glossary,
+      usage,
+      signal,
+      context,
+    );
 
     for (const paragraph of batch) {
       const returned = cleaned.get(paragraph.index);

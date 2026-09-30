@@ -6,6 +6,7 @@ import {
 import { sleep } from '@utils/sleep';
 import { AIRequestError, getAIProvider } from './providers';
 import { createLimiter, type Limiter } from './limiter';
+import { recordAIRequest, type AIRequestStatus } from './requestLog';
 import type { AIRequest, AIResponse, AIUsage } from './types';
 
 const MAX_ATTEMPTS = 3;
@@ -58,27 +59,68 @@ export const requestAI = async (
   };
 
   return getLimiter(settings.concurrency)(async () => {
-    let lastError: unknown;
+    // Timed from here rather than from the call: time spent waiting behind
+    // the concurrency gate says nothing about the provider.
+    const startedAt = Date.now();
+    let attempts = 0;
+    const log = (outcome: {
+      status: AIRequestStatus;
+      error?: unknown;
+      usage?: AIUsage;
+    }) =>
+      recordAIRequest({
+        ...(request.context ?? { kind: 'test' }),
+        startedAt,
+        durationMs: Date.now() - startedAt,
+        provider: config.provider,
+        model: config.model,
+        attempts,
+        status: outcome.status,
+        usage: outcome.usage,
+        error:
+          outcome.error === undefined
+            ? undefined
+            : outcome.error instanceof Error
+            ? outcome.error.message
+            : String(outcome.error),
+      });
+    const fail = (error: unknown): never => {
+      // A request cancelled while still queued never reached the provider;
+      // cancelling a long job would bury the log under those.
+      if (attempts === 0) {
+        throw error;
+      }
+      log({
+        status: request.signal?.aborted ? 'cancelled' : 'error',
+        error,
+      });
+      throw error;
+    };
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       if (request.signal?.aborted) {
-        throw new AIRequestError('Cancelled');
+        return fail(new AIRequestError('Cancelled'));
       }
+      attempts = attempt + 1;
       try {
-        return await provider.send(config, request);
+        const response = await provider.send(config, request);
+        return {
+          ...response,
+          logId: log({ status: 'success', usage: response.usage }),
+        };
       } catch (error) {
-        lastError = error;
         const retryable =
           error instanceof AIRequestError &&
           error.retryable &&
           !request.signal?.aborted;
         if (!retryable || attempt === MAX_ATTEMPTS - 1) {
-          throw error;
+          return fail(error);
         }
         await sleep(BASE_BACKOFF_MS * 2 ** attempt);
       }
     }
 
-    throw lastError;
+    // Unreachable: the last attempt either returns or fails above.
+    return fail(new AIRequestError('Request failed'));
   });
 };

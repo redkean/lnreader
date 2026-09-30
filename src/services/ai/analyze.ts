@@ -2,6 +2,7 @@ import { requestAI } from './client';
 import { parseJsonResponse } from './json';
 import { extractCleanupParagraphs } from './paragraphs';
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisPrompt } from './prompts';
+import { markAIRequestRejected } from './requestLog';
 import { ANALYSIS_SCHEMA } from './schemas';
 import type {
   AIChapterAnalysis,
@@ -105,17 +106,27 @@ export const analyzeChapter = async (
     maxOutputTokens: 1200,
     schema: ANALYSIS_SCHEMA,
     signal,
+    context: {
+      kind: 'summary',
+      novelName: args.novelName,
+      chapterName: args.chapterName,
+    },
   });
 
-  const parsed = parseJsonResponse<Record<string, unknown>>(response.text);
-  const summary =
-    typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
-  if (!summary) {
-    throw new Error('Model returned no summary');
-  }
+  try {
+    const parsed = parseJsonResponse<Record<string, unknown>>(response.text);
+    const summary =
+      typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+    if (!summary) {
+      throw new Error('Model returned no summary');
+    }
 
-  return {
-    analysis: { summary, terms: coerceTerms(parsed.terms) },
-    usage: response.usage,
-  };
+    return {
+      analysis: { summary, terms: coerceTerms(parsed.terms) },
+      usage: response.usage,
+    };
+  } catch (error) {
+    markAIRequestRejected(response.logId, error);
+    throw error;
+  }
 };

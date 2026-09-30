@@ -148,6 +148,33 @@ class NativeBackgroundTasksModule : Module() {
             }
         }
 
+        AsyncFunction("getFailedTasks") { limit: Int ->
+            runBlocking(Dispatchers.IO) {
+                dao.getFailed(limit).map(::toRecord)
+            }
+        }
+
+        AsyncFunction("removeFailed") {
+            runBlocking(Dispatchers.IO) {
+                // Not only the listed ones: failures older than the list's
+                // limit would otherwise surface one page at a time.
+                val context = appContext.reactContext!!
+                dao.getFailed(Int.MAX_VALUE).forEach {
+                    TaskNotificationFactory.dismiss(context, it.id)
+                }
+                dao.deleteFailed()
+            }
+        }
+
+        AsyncFunction("remove") { taskId: String ->
+            runBlocking(Dispatchers.IO) {
+                dao.deleteFinished(taskId)
+                if (dao.get(taskId) == null) {
+                    TaskNotificationFactory.dismiss(appContext.reactContext!!, taskId)
+                }
+            }
+        }
+
         AsyncFunction("scheduleLibraryUpdates") { intervalHours: Long, title: String, description: String ->
             LibraryUpdateScheduler.schedule(
                 appContext.reactContext!!,

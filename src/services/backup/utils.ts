@@ -25,6 +25,7 @@ import {
 } from './types';
 import { NOVEL_STORAGE, ROOT_STORAGE } from '@utils/Storages';
 import { BACKGROUND_TASKS_STORE_KEY } from '@services/backgroundTasks/constants';
+import { AI_REQUEST_LOG_KEY } from '@services/ai/requestLog';
 import type { TaskProgressUpdater } from '@services/backgroundTasks/contracts';
 import NativeFile from '@modules/native-file';
 import { getString } from '@i18n/translations';
@@ -69,6 +70,7 @@ const backupMMKVData = () => {
     SELF_HOST_BACKUP,
     LAST_UPDATE_TIME,
     INSTALLED_PLUGINS_KEY,
+    AI_REQUEST_LOG_KEY,
   ];
   const keys = MMKVStorage.getAllKeys().filter(
     key => !excludeKeys.includes(key),

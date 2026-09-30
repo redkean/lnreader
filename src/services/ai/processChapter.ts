@@ -145,6 +145,8 @@ export const processChapter = async (
             : [],
           paragraphsPerBatch: settings.paragraphsPerBatch,
           reverted: existing?.reverted,
+          novelName: args.novel.name,
+          chapterName: args.chapter.name,
         },
         onProgress,
         signal,

@@ -59,4 +59,13 @@ interface BackgroundTaskDao {
 
     @Query("UPDATE background_tasks SET workId = :workId, updatedAt = :updatedAt WHERE id = :id")
     suspend fun assignWork(id: String, workId: String, updatedAt: Long)
+
+    @Query("SELECT * FROM background_tasks WHERE state = 'failed' ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun getFailed(limit: Int): List<BackgroundTaskEntity>
+
+    @Query("DELETE FROM background_tasks WHERE id = :id AND state NOT IN ('queued', 'running', 'paused')")
+    suspend fun deleteFinished(id: String)
+
+    @Query("DELETE FROM background_tasks WHERE state = 'failed'")
+    suspend fun deleteFailed()
 }

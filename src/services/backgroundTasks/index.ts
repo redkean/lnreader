@@ -19,6 +19,7 @@ export type {
   DownloadChapterTask,
   EpubExportData,
   EpubImportFile,
+  FailedBackgroundTask,
   HeadlessBackgroundTaskData,
   MigrateNovelData,
   MigrationNovelOptions,

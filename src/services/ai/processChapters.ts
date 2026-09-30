@@ -138,7 +138,7 @@ export const processChapters = async (
     throw new Error(
       `${failures.length} of ${
         chapters.length
-      } chapters failed: ${failures.join('; ')}`,
+      } chapters failed:\n${failures.join('\n')}`,
     );
   }
 };

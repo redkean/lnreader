@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, FlatList, View, Text, StyleSheet } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import dayjs from 'dayjs';
 import {
   FAB,
   ProgressBar,
@@ -23,6 +25,7 @@ import { TaskQueueScreenProps } from '@navigators/types';
 import {
   BACKGROUND_TASKS_STORE_KEY,
   backgroundTasks,
+  FailedBackgroundTask,
   QueuedBackgroundTask,
 } from '@services/backgroundTasks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +40,7 @@ const DownloadQueue = ({ navigation }: TaskQueueScreenProps) => {
   const [isRunning, setIsRunning] = useState(backgroundTasks.isRunning);
   const [visible, setVisible] = useState(false);
   const [taskToCancel, setTaskToCancel] = useState<QueuedBackgroundTask>();
+  const [failedTasks, setFailedTasks] = useState<FailedBackgroundTask[]>([]);
   const openMenu = () => setVisible(true);
   const closeMenu = () => setVisible(false);
   useEffect(() => {
@@ -45,6 +49,51 @@ const DownloadQueue = ({ navigation }: TaskQueueScreenProps) => {
       setIsRunning(false);
     }
   }, [taskQueue]);
+
+  // A load that was already in flight when a task was dismissed would
+  // otherwise put it back.
+  const dismissedIds = useRef(new Set<string>());
+  const loadFailedTasks = useCallback(() => {
+    backgroundTasks
+      .getFailedTasks()
+      .then(tasks =>
+        setFailedTasks(
+          tasks.filter(task => !dismissedIds.current.has(task.id)),
+        ),
+      )
+      .catch(() => undefined);
+  }, []);
+
+  // A task leaves the queue when it finishes, so that is the moment a new
+  // failure can have appeared. Keyed on the ids, not the queue itself, which
+  // changes with every progress update.
+  const taskIds = (taskQueue ?? []).map(task => task.id).join('|');
+  useEffect(loadFailedTasks, [loadFailedTasks, taskIds]);
+
+  // A task that fails natively never touches the queue, and the failure
+  // notification opens this screen without remounting it.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        loadFailedTasks();
+      }
+    });
+    return () => subscription.remove();
+  }, [loadFailedTasks]);
+
+  const dismissFailed = useCallback((task: FailedBackgroundTask) => {
+    dismissedIds.current.add(task.id);
+    setFailedTasks(current => current.filter(item => item.id !== task.id));
+    backgroundTasks.dismissFailedTask(task.id).catch(() => undefined);
+  }, []);
+
+  const clearFailed = useCallback(() => {
+    setFailedTasks(current => {
+      current.forEach(task => dismissedIds.current.add(task.id));
+      return [];
+    });
+    backgroundTasks.clearFailedTasks().catch(() => undefined);
+  }, []);
 
   return (
     <SafeAreaView excludeTop>
@@ -57,7 +106,7 @@ const DownloadQueue = ({ navigation }: TaskQueueScreenProps) => {
           visible={visible}
           onDismiss={closeMenu}
           anchor={
-            taskQueue?.length ? (
+            taskQueue?.length || failedTasks.length ? (
               <MaterialAppbar.Action
                 icon="dots-vertical"
                 iconColor={theme.onSurface}
@@ -67,16 +116,28 @@ const DownloadQueue = ({ navigation }: TaskQueueScreenProps) => {
           }
           contentStyle={{ backgroundColor: overlay(2, theme.surface) }}
         >
-          <Menu.Item
-            onPress={() => {
-              backgroundTasks.cancelAll();
-              setIsRunning(false);
-              showToast(getString('downloadScreen.cancelled'));
-              closeMenu();
-            }}
-            title={getString('downloadScreen.cancelDownloads')}
-            titleStyle={{ color: theme.onSurface }}
-          />
+          {taskQueue?.length ? (
+            <Menu.Item
+              onPress={() => {
+                backgroundTasks.cancelAll();
+                setIsRunning(false);
+                showToast(getString('downloadScreen.cancelled'));
+                closeMenu();
+              }}
+              title={getString('downloadScreen.cancelDownloads')}
+              titleStyle={{ color: theme.onSurface }}
+            />
+          ) : null}
+          {failedTasks.length ? (
+            <Menu.Item
+              onPress={() => {
+                clearFailed();
+                closeMenu();
+              }}
+              title={getString('taskQueue.clearFailedTasks')}
+              titleStyle={{ color: theme.onSurface }}
+            />
+          ) : null}
         </Menu>
       </Appbar>
 
@@ -118,11 +179,66 @@ const DownloadQueue = ({ navigation }: TaskQueueScreenProps) => {
           </View>
         )}
         ListEmptyComponent={
-          <EmptyView
-            icon="(･o･;)"
-            description={'No running tasks'}
-            theme={theme}
-          />
+          failedTasks.length ? null : (
+            <EmptyView
+              icon="(･o･;)"
+              description={'No running tasks'}
+              theme={theme}
+            />
+          )
+        }
+        ListFooterComponent={
+          failedTasks.length ? (
+            <View>
+              <Text style={[styles.sectionTitle, { color: theme.error }]}>
+                {getString('taskQueue.failedTasks')}
+              </Text>
+              {failedTasks.map(task => (
+                <View key={task.id} style={styles.padding}>
+                  <View style={styles.taskRow}>
+                    <View style={styles.taskDetails}>
+                      <Text style={{ color: theme.onSurface }}>
+                        {task.name}
+                      </Text>
+                      <Text style={{ color: theme.onSurfaceVariant }}>
+                        {dayjs(task.failedAt).format('LLL')}
+                      </Text>
+                    </View>
+                    <IconButtonV2
+                      accessibilityLabel={`${getString(
+                        'taskQueue.copyError',
+                      )} ${task.name}`}
+                      name="content-copy"
+                      onPress={() =>
+                        Clipboard.setStringAsync(
+                          `${task.name}\n${task.error}`,
+                        ).then(() =>
+                          showToast(
+                            getString('common.copiedToClipboard', { name: '' }),
+                          ),
+                        )
+                      }
+                      theme={theme}
+                    />
+                    <IconButtonV2
+                      accessibilityLabel={`${getString(
+                        'taskQueue.dismissFailedTask',
+                      )} ${task.name}`}
+                      name="close"
+                      onPress={() => dismissFailed(task)}
+                      theme={theme}
+                    />
+                  </View>
+                  <Text
+                    selectable
+                    style={[styles.marginTop, { color: theme.error }]}
+                  >
+                    {task.error}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null
         }
       />
       {taskQueue && taskQueue.length > 0 ? (
@@ -177,6 +293,11 @@ const styles = StyleSheet.create({
   marginTop: { marginTop: 8 },
   paddingBottom: { paddingBottom: 100, flexGrow: 1 },
   padding: { padding: 16 },
+  sectionTitle: {
+    fontWeight: '500',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
   taskDetails: { flex: 1 },
   taskRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
 });

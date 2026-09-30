@@ -184,6 +184,12 @@ const AISettings = ({ navigation }: AISettingsProps) => {
               onPress={testConnection}
             />
           </View>
+          <List.Item
+            title={getString('aiSettings.requestLog')}
+            description={getString('aiSettings.requestLogDescription')}
+            onPress={() => navigation.navigate('AIRequestLog')}
+            theme={theme}
+          />
 
           <List.SubHeader theme={theme}>
             {getString('aiSettings.features')}

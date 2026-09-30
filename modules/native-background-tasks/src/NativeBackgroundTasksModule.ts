@@ -37,6 +37,12 @@ type NativeBackgroundTasksModule = {
   updateCheckpoint(taskId: string, checkpoint: string): Promise<void>;
   complete(taskId: string, completionText: string): Promise<void>;
   fail(taskId: string, error: string, shouldRetry: boolean): Promise<void>;
+  /** Failed tasks only, newest first. */
+  getFailedTasks(limit: number): Promise<NativeBackgroundTaskRecord[]>;
+  /** Deletes a finished task's record. Active tasks are left alone. */
+  remove(taskId: string): Promise<void>;
+  /** Deletes every failed task's record, listed or not. */
+  removeFailed(): Promise<void>;
   scheduleLibraryUpdates(
     intervalHours: number,
     title: string,

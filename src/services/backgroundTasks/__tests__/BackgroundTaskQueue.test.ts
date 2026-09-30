@@ -12,6 +12,9 @@ jest.mock('@modules/native-background-tasks', () => ({
     complete: jest.fn(),
     enqueue: jest.fn().mockResolvedValue('native-task-1'),
     fail: jest.fn(),
+    getFailedTasks: jest.fn().mockResolvedValue([]),
+    remove: jest.fn().mockResolvedValue(undefined),
+    removeFailed: jest.fn().mockResolvedValue(undefined),
     updateProgress: jest.fn().mockResolvedValue(undefined),
   },
 }));
@@ -228,5 +231,45 @@ describe('BackgroundTaskQueue completion notifications', () => {
 
     resolvers.forEach(resolve => resolve());
     await Promise.all([firstRun, secondRun]);
+  });
+});
+
+describe('BackgroundTaskQueue failed tasks', () => {
+  beforeEach(() => {
+    mockStoredTasks = [];
+    jest.clearAllMocks();
+  });
+
+  const record = (id: string, state: string, updatedAt: number) => ({
+    id,
+    type: 'AI_PROCESS_CHAPTERS',
+    payload: '{}',
+    title: `Task ${id}`,
+    state,
+    progressText: `Failed: ${id} broke`,
+    attempt: 1,
+    createdAt: 0,
+    updatedAt,
+  });
+
+  it('reports each failed task with its full error', async () => {
+    jest
+      .mocked(NativeBackgroundTasks.getFailedTasks)
+      .mockResolvedValue([record('new', 'failed', 400)]);
+
+    await expect(new BackgroundTaskQueue().getFailedTasks()).resolves.toEqual([
+      {
+        id: 'new',
+        name: 'Task new',
+        error: 'Failed: new broke',
+        failedAt: 400,
+      },
+    ]);
+  });
+
+  it('removes the native record of a dismissed task', async () => {
+    await new BackgroundTaskQueue().dismissFailedTask('old');
+
+    expect(NativeBackgroundTasks.remove).toHaveBeenCalledWith('old');
   });
 });

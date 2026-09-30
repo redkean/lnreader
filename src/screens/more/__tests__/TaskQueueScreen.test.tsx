@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import { backgroundTasks } from '@services/backgroundTasks';
 import TaskQueueScreen from '../TaskQueueScreen';
@@ -62,6 +67,9 @@ jest.mock('@services/backgroundTasks', () => ({
   backgroundTasks: {
     cancel: jest.fn().mockResolvedValue(undefined),
     cancelAll: jest.fn(),
+    clearFailedTasks: jest.fn().mockResolvedValue(undefined),
+    dismissFailedTask: jest.fn().mockResolvedValue(undefined),
+    getFailedTasks: jest.fn().mockResolvedValue([]),
     isRunning: true,
     pauseAll: jest.fn(),
     resumeAll: jest.fn(),
@@ -77,11 +85,16 @@ jest.mock('@i18n/translations', () => ({
       return `Are you sure you want to cancel ${values?.task}?`;
     }
     if (key === 'taskQueue.keepTaskAction') return 'Keep task';
+    if (key === 'taskQueue.dismissFailedTask') return 'Dismiss';
     return key;
   },
 }));
 
 jest.mock('@utils/showToast', () => ({ showToast: jest.fn() }));
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn().mockResolvedValue(true),
+}));
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, right: 0 }),
@@ -203,5 +216,31 @@ describe('TaskQueueScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Cancel task' }));
 
     expect(backgroundTasks.cancel).toHaveBeenCalledWith('task-2');
+  });
+
+  it('keeps a failed task and its full error on screen until dismissed', async () => {
+    const error =
+      'Failed: 2 of 5 chapters failed:\nChapter 3: 429\nChapter 4: 500';
+    jest
+      .mocked(backgroundTasks.getFailedTasks)
+      .mockResolvedValue([
+        { id: 'failed-1', name: 'AI: First Novel', error, failedAt: 1 },
+      ]);
+
+    render(
+      <TaskQueueScreen
+        navigation={{ goBack: jest.fn() } as never}
+        route={{} as never}
+      />,
+    );
+
+    expect(await screen.findByText(error)).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dismiss AI: First Novel' }),
+    );
+
+    expect(backgroundTasks.dismissFailedTask).toHaveBeenCalledWith('failed-1');
+    await waitFor(() => expect(screen.queryByText(error)).toBeNull());
   });
 });

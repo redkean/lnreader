@@ -116,7 +116,24 @@
     "estimateBody": "Roughly %{input} input and %{output} output tokens. Your provider bills for both.",
     "estimateCapped": "Limited to %{count} chapters by your per-job maximum",
     "run": "Run",
-    "jobFinished": "Processed %{chapters} chapters (~%{tokens} tokens)"
+    "jobFinished": "Processed %{chapters} chapters (~%{tokens} tokens)",
+    "errorTitle": "AI request failed",
+    "copyError": "Copy error",
+    "requestLog": "Request log",
+    "requestLogDescription": "Every request sent to the provider, with its errors",
+    "requestLogEmpty": "No AI requests yet",
+    "requestLogNoErrors": "No failed requests",
+    "requestLogErrorsOnly": "Show failed requests only",
+    "requestLogShowAll": "Show all requests",
+    "requestLogClear": "Clear request log",
+    "requestLogClearConfirm": "Delete the whole request log?",
+    "requestKindCleanup": "Cleanup",
+    "requestKindSummary": "Summary",
+    "requestKindRecap": "Recap",
+    "requestKindTest": "Connection test",
+    "requestCancelled": "Cancelled",
+    "requestTokens": "%{input} in · %{output} out",
+    "requestAttempts": "%{count} attempts"
   },
   "appearance": "Appearance",
   "appearanceScreen": {
@@ -467,7 +484,11 @@
     "cancelTaskAction": "Cancel task",
     "cancelTaskTitle": "Cancel task?",
     "cancelTaskConfirmation": "Are you sure you want to cancel %{task}?",
-    "keepTaskAction": "Keep task"
+    "keepTaskAction": "Keep task",
+    "failedTasks": "Failed",
+    "copyError": "Copy error",
+    "dismissFailedTask": "Dismiss",
+    "clearFailedTasks": "Clear failed tasks"
   },
   "errorBoundary": {
     "title": "An Unexpected Error Occurred",

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
@@ -16,6 +17,9 @@ object TaskNotificationFactory {
     const val ACTION_CANCEL = "expo.modules.nativebackgroundtasks.CANCEL"
     const val EXTRA_TASK_ID = "taskId"
     private const val TERMINAL_NOTIFICATION_MASK = 0x40000000
+    // Routed by the app's React Navigation linking config to the task queue,
+    // where a failed task's full error stays readable.
+    private const val TASK_QUEUE_URI = "lnreader://tasks"
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -39,7 +43,14 @@ object TaskNotificationFactory {
 
     fun build(context: Context, task: BackgroundTaskEntity): Notification {
         ensureChannel(context)
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val taskQueueIntent = Intent(Intent.ACTION_VIEW, Uri.parse(TASK_QUEUE_URI))
+            .setPackage(context.packageName)
+            .takeIf {
+                task.state == BackgroundTaskState.FAILED &&
+                    it.resolveActivity(context.packageManager) != null
+            }
+        val launchIntent = taskQueueIntent
+            ?: context.packageManager.getLaunchIntentForPackage(context.packageName)
         val contentIntent = launchIntent?.let {
             PendingIntent.getActivity(
                 context,
@@ -101,7 +112,13 @@ object TaskNotificationFactory {
             task.state in listOf(BackgroundTaskState.SUCCEEDED, BackgroundTaskState.FAILED) &&
             contentText.isNotBlank()
         ) {
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+            // Expanded, a terminal notification shows every line: a failure
+            // often lists one reason per item that failed.
+            builder.setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    progressLines.joinToString("\n").ifBlank { contentText },
+                ),
+            )
         }
 
         if (

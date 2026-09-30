@@ -99,9 +99,12 @@ const MainNavigator = () => {
       linking={{
         prefixes: ['lnreader://'],
         config: {
+          // A link opened from a cold start still has somewhere to go back to.
+          initialRouteName: 'BottomNavigator',
           screens: {
             MoreStack: {
               screens: {
+                TaskQueue: '/tasks',
                 SettingsStack: {
                   screens: {
                     RespositorySettings: '/repo/add',

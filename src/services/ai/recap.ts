@@ -1,5 +1,6 @@
 import { getRecapSummaries } from '@database/queries/AIQueries';
 import { requestAI } from './client';
+import { markAIRequestRejected } from './requestLog';
 import { buildRecapPrompt, RECAP_SYSTEM_PROMPT } from './prompts';
 import type { AIUsage } from './types';
 
@@ -42,11 +43,14 @@ export const buildRecap = async (
     maxOutputTokens: 700,
     temperature: 0.3,
     signal,
+    context: { kind: 'recap', novelName: args.novelName },
   });
 
   const recap = response.text.trim();
   if (!recap) {
-    throw new Error('Model returned an empty recap');
+    const error = new Error('Model returned an empty recap');
+    markAIRequestRejected(response.logId, error);
+    throw error;
   }
 
   return { recap, chapters: summaries.length, usage: response.usage };

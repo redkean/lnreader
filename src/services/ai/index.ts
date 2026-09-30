@@ -34,6 +34,13 @@ export {
 export { AI_PROVIDER_LIST, AI_PROVIDERS, getAIProvider } from './providers';
 export { buildRecap, NoSummariesError } from './recap';
 export {
+  AI_REQUEST_LOG_KEY,
+  clearAIRequestLog,
+  getAIRequestLog,
+  type AIRequestLogEntry,
+  type AIRequestStatus,
+} from './requestLog';
+export {
   deleteCleanupSidecar,
   readCleanupSidecar,
   setParagraphReverted,

@@ -128,6 +128,14 @@ export type QueuedBackgroundTask = {
   state?: NativeBackgroundTaskRecord['state'];
 };
 
+/** A task that ended in failure, kept until the user dismisses it. */
+export type FailedBackgroundTask = {
+  id: string;
+  name: string;
+  error: string;
+  failedAt: number;
+};
+
 export type HeadlessBackgroundTaskData = {
   taskId: string;
 };

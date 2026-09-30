@@ -42,6 +42,16 @@ export type AIRequest = {
    */
   schema?: AIResponseSchema;
   signal?: AbortSignal;
+  /** What the request is for. Never sent to the provider; only logged. */
+  context?: AIRequestContext;
+};
+
+export type AIRequestKind = 'cleanup' | 'summary' | 'recap' | 'test';
+
+export type AIRequestContext = {
+  kind: AIRequestKind;
+  novelName?: string;
+  chapterName?: string;
 };
 
 export type AIUsage = {
@@ -52,6 +62,8 @@ export type AIUsage = {
 export type AIResponse = {
   text: string;
   usage?: AIUsage;
+  /** The request log entry, for callers that later reject the response. */
+  logId?: string;
 };
 
 export type AIProviderConfig = {
