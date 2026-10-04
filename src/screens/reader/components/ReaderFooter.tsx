@@ -144,11 +144,7 @@ const ChapterFooter = ({
           onPress={openTtsPlayer}
           accessibilityLabel={getString('ttsPlayer.listen')}
         >
-          <IconButton
-            icon="headphones"
-            size={26}
-            iconColor={theme.onSurface}
-          />
+          <IconButton icon="headphones" size={26} iconColor={theme.onSurface} />
         </Pressable>
         <Pressable
           android_ripple={rippleConfig}
