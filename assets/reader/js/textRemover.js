@@ -43,6 +43,19 @@ window.textRemover = new (function () {
         },
         reader.strings.replaceText,
       ),
+      button(
+        {
+          type: 'button',
+          id: 'text-selection-pronounce',
+          onclick: e => {
+            if (reader.hidden.val) {
+              e.stopPropagation();
+            }
+            pronounceSelectedText();
+          },
+        },
+        reader.strings.pronounce,
+      ),
     );
 
     document.body.appendChild(selectionUI);
@@ -51,6 +64,13 @@ window.textRemover = new (function () {
 
   function showSelectionUI() {
     const ui = createSelectionUI();
+    // TTS can be switched off after the bar was built.
+    const pronounce = ui.querySelector('#text-selection-pronounce');
+    if (pronounce) {
+      pronounce.style.display = reader.generalSettings.val.TTSEnable
+        ? ''
+        : 'none';
+    }
 
     // Get selection bounds
     const selection = window.getSelection();
@@ -162,6 +182,18 @@ window.textRemover = new (function () {
       reader.post({
         type: 'text-action',
         data: { replace: selectedText },
+      });
+    }
+    hideSelectionUI();
+    window.getSelection().removeAllRanges();
+  }
+
+  function pronounceSelectedText() {
+    const selectedText = lastSelectedText || getSelectedText();
+    if (selectedText) {
+      reader.post({
+        type: 'text-action',
+        data: { pronounce: selectedText },
       });
     }
     hideSelectionUI();

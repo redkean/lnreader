@@ -12,6 +12,9 @@ import {
 import { getString } from '@i18n/translations';
 import { Chip } from 'react-native-paper';
 import ReaderSheetPreferenceItem from './ReaderSheetPreferenceItem';
+import { useChapterContext } from '../../ChapterContext';
+import { usePronunciations } from '@hooks/persisted/usePronunciations';
+import PronunciationListDialog from '../Pronunciation/PronunciationListDialog';
 
 interface VoicePickerModalProps {
   visible: boolean;
@@ -299,6 +302,12 @@ const TTSTab: React.FC = () => {
   const [voices, setVoices] = useState<TtsVoice[]>([]);
   const [engineModalVisible, setEngineModalVisible] = useState(false);
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [pronunciationsVisible, setPronunciationsVisible] = useState(false);
+  const { novel } = useChapterContext();
+  const pronunciations = usePronunciations(novel);
+  const pronunciationCount =
+    Object.keys(pronunciations.novel).length +
+    Object.keys(pronunciations.global).length;
 
   // Android only; resolves empty on iOS, which hides the Engine row below.
   useEffect(() => {
@@ -366,6 +375,16 @@ const TTSTab: React.FC = () => {
                 title="Voice"
                 description={tts?.voice?.name || 'System default'}
                 onPress={() => setVoiceModalVisible(true)}
+                right="chevron-right"
+                theme={theme}
+              />
+
+              <List.Item
+                title={getString('readerScreen.pronunciation.titlePlural')}
+                description={getString('readerScreen.pronunciation.count', {
+                  count: pronunciationCount,
+                })}
+                onPress={() => setPronunciationsVisible(true)}
                 right="chevron-right"
                 theme={theme}
               />
@@ -456,6 +475,11 @@ const TTSTab: React.FC = () => {
         voices={voices}
         onSelect={handleVoiceSelect}
         currentVoice={tts?.voice}
+      />
+      <PronunciationListDialog
+        visible={pronunciationsVisible}
+        novel={novel}
+        onDismiss={() => setPronunciationsVisible(false)}
       />
     </>
   );

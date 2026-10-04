@@ -40,6 +40,7 @@ import { Dialog } from '@components/Dialog';
 import { TextInput } from 'react-native-paper';
 import useCustomCode from './Hooks/useCustomCode';
 import useTextModifications from './Hooks/useTextModifications';
+import PronunciationDialog from './Pronunciation/PronunciationDialog';
 import {
   isChapterRefreshUrl,
   isPluginIssueReportUrl,
@@ -238,6 +239,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
     handleReplaceSave,
     handleReplaceCancel,
     eventTextAction,
+    pronounceWord,
+    setPronounceWord,
   } = useTextModifications(html, webViewRef);
 
   const [readerSettings, setReaderSettings] = useState(
@@ -458,6 +461,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                     noNextChapter: getString('readerScreen.noNextChapter'),
                     removeText: getString('common.remove'),
                     replaceText: getString('customCodeSettings.replace'),
+                    pronounce: getString('readerScreen.pronunciation.action'),
                   },
                 })}
               </script>
@@ -704,6 +708,12 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
           <Dialog.Action onPress={handleReplaceSave}>Save</Dialog.Action>
         </Dialog.Actions>
       </Dialog.Root>
+      <PronunciationDialog
+        visible={pronounceWord !== undefined}
+        word={pronounceWord ?? ''}
+        novel={novel}
+        onDismiss={() => setPronounceWord(undefined)}
+      />
     </>
   );
 };

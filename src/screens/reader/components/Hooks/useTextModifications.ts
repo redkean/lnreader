@@ -11,6 +11,8 @@ export default function useTextModifications(
   const [replaceModalVisible, setReplaceModalVisible] = useState(false);
   const [selectedTextForReplace, setSelectedTextForReplace] = useState('');
   const [replacementText, setReplacementText] = useState('');
+  // The word the pronunciation editor is open for; `undefined` while closed.
+  const [pronounceWord, setPronounceWord] = useState<string>();
 
   const { setChapterReaderSettings, ...readerSettings } =
     useChapterReaderSettings();
@@ -59,6 +61,8 @@ export default function useTextModifications(
         setSelectedTextForReplace(text);
         setReplacementText('');
         setReplaceModalVisible(true);
+      } else if (action === 'pronounce') {
+        setPronounceWord(text);
       }
     },
     [readerSettings.removeText, setChapterReaderSettings, injectJS],
@@ -114,5 +118,7 @@ export default function useTextModifications(
     handleReplaceSave,
     handleReplaceCancel,
     eventTextAction,
+    pronounceWord,
+    setPronounceWord,
   };
 }

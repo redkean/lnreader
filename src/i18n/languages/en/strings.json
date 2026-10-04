@@ -810,6 +810,26 @@
     "nextChapter": "Next: %{name}",
     "noNextChapter": "There's no next chapter",
     "noPreviousChapter": "There's no previous chapter",
+    "pronunciation": {
+      "action": "Pronounce",
+      "add": "Add pronunciation",
+      "allNovels": "All novels",
+      "count": {
+        "one": "%{count} word",
+        "other": "%{count} words"
+      },
+      "empty": "No pronunciations yet. Select a word while reading and tap Pronounce.",
+      "enterSayAs": "Enter how it should sound",
+      "enterWord": "Enter a word",
+      "novelOnly": "Only for this novel",
+      "preview": "Preview",
+      "sayAs": "Say it as",
+      "sayAsHint": "Spell it the way it sounds. Only narration changes; the page keeps the original text.",
+      "thisNovel": "This novel",
+      "title": "Pronunciation",
+      "titlePlural": "Pronunciations",
+      "word": "Word"
+    },
     "searchMinLength": "Enter at least %{count} characters to search",
     "searchPlaceholder": "Search chapter"
   },

@@ -58,6 +58,11 @@ jest.mock('@screens/reader/utils/ttsSettings', () => ({
   toNativeTtsSettings: jest.fn(() => ({})),
 }));
 
+const mockPronunciations: Record<string, string> = {};
+jest.mock('@hooks/persisted/usePronunciations', () => ({
+  getPronunciations: () => mockPronunciations,
+}));
+
 jest.mock('@utils/runWhenIdle', () => ({
   runWhenIdle: (task: () => void) => {
     task();
@@ -162,5 +167,33 @@ describe('useTtsPlayer persistence', () => {
     expect(insertHistory).not.toHaveBeenCalled();
     expect(novelPersistence.writeLastRead).not.toHaveBeenCalled();
     expect(markChapterRead).not.toHaveBeenCalled();
+  });
+});
+
+describe('useTtsPlayer pronunciations', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockStateListeners.length = 0;
+  });
+
+  afterEach(() => {
+    delete mockPronunciations.first;
+  });
+
+  it('speaks the respelled words while keeping the shown paragraphs as written', async () => {
+    mockPronunciations.first = '1st';
+    const session = createSession();
+    (Tts.createSession as jest.Mock).mockResolvedValue(session);
+    const { result } = renderHook(() => useTtsPlayer());
+
+    await act(async () => {
+      await result.current.playChapter(novel, chapter500);
+    });
+
+    expect(session.load.mock.calls[0][0]).toEqual([
+      { id: '0', text: '1st' },
+      { id: '1', text: 'second' },
+    ]);
+    expect(result.current.paragraphs).toEqual(['first', 'second']);
   });
 });

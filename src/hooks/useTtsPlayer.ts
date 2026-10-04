@@ -28,6 +28,8 @@ import {
 import { plainTextRules } from '@screens/reader/utils/textRules';
 import { applyTextModifications } from '@utils/customCode';
 import { toNativeTtsSettings } from '@screens/reader/utils/ttsSettings';
+import { compilePronunciations } from '@screens/reader/utils/pronunciations';
+import { getPronunciations } from '@hooks/persisted/usePronunciations';
 import { getAISettings } from '@hooks/persisted/useAISettings';
 import { hashChapterText, readCleanupSidecar } from '@services/ai';
 import { fetchChapter } from '@services/plugin/fetch';
@@ -279,9 +281,15 @@ export const useTtsPlayer = () => {
 
         setParagraphs(queue);
 
+        // Applied here rather than in the cached queue, so an entry added
+        // mid-book takes effect on the next chapter that starts.
+        const pronounce = compilePronunciations(getPronunciations(novel));
         const session = await ensureSession();
         await session.load(
-          queue.map((text, index) => ({ id: String(index), text })),
+          queue.map((text, index) => ({
+            id: String(index),
+            text: pronounce(text),
+          })),
           Math.min(Math.max(startIndex, 0), queue.length - 1),
           {
             novelName: novel.name,
