@@ -124,6 +124,7 @@ export interface LibrarySettings {
   filter?: LibraryFilter;
   showDownloadBadges?: boolean;
   showUnreadBadges?: boolean;
+  showContinueReadingButton?: boolean;
   showNumberOfNovels?: boolean;
   displayMode?: DisplayModes;
   novelsPerRow?: number;
@@ -193,6 +194,8 @@ export interface ChapterGeneralSettings {
   bionicReading: boolean;
   tapToScroll: boolean;
   TTSEnable: boolean;
+  pageReaderInvertVolumeButtons: boolean;
+  pageReaderDisableAnimation: boolean;
 }
 
 export interface ReaderTheme {
@@ -318,6 +321,8 @@ export const initialChapterGeneralSettings: ChapterGeneralSettings = {
   bionicReading: false,
   tapToScroll: false,
   TTSEnable: true,
+  pageReaderInvertVolumeButtons: false,
+  pageReaderDisableAnimation: false,
 };
 
 export const initialChapterReaderSettings: ChapterReaderSettings = {
@@ -385,6 +390,7 @@ const defaultLibrarySettings: LibrarySettings = {
   displayMode: DisplayModes.Comfortable,
   showDownloadBadges: true,
   showUnreadBadges: true,
+  showContinueReadingButton: false,
   novelsPerRow: 3,
   sortOrder: LibrarySortOrder.DateAdded_DESC,
 };

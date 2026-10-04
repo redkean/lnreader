@@ -17,28 +17,11 @@ window.textRemover = new (function () {
     selectionUI = div(
       {
         id: 'text-selection-ui',
-        style: `
-          position: fixed;
-          background: color-mix(in srgb, var(--theme-surface), transparent 10%);
-          border-radius: 8px;
-          padding: 8px;
-          z-index: 100000;
-          opacity: 0;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-          transition: opacity 150ms
-          `,
+        role: 'group',
       },
       button(
         {
-          style: `
-            background: var(--theme-secondary);
-            color: var(--theme-onSecondary);
-            padding: 6px 12px;
-            margin: 2px;
-            border: 0;
-            border-radius: 4px;
-            font-size: 12px;
-            `,
+          type: 'button',
           onclick: e => {
             if (reader.hidden.val) {
               e.stopPropagation();
@@ -46,19 +29,11 @@ window.textRemover = new (function () {
             removeSelectedText();
           },
         },
-        'Remove',
+        reader.strings.removeText,
       ),
       button(
         {
-          style: `
-            background: var(--theme-secondary);
-            color: var(--theme-onSecondary);
-            padding: 6px 12px;
-            margin: 2px;
-            border: 0;
-            border-radius: 4px;
-            font-size: 12px;
-          `,
+          type: 'button',
           onclick: e => {
             if (reader.hidden.val) {
               e.stopPropagation();
@@ -66,7 +41,7 @@ window.textRemover = new (function () {
             replaceSelectedText();
           },
         },
-        'Replace',
+        reader.strings.replaceText,
       ),
     );
 

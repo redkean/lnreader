@@ -404,6 +404,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                 --theme-surfaceVariant: ${theme.surfaceVariant};
                 --theme-onSurfaceVariant: ${theme.onSurfaceVariant};
                 --theme-outline: ${theme.outline};
+                --theme-outlineVariant: ${theme.outlineVariant};
                 --theme-rippleColor: ${theme.rippleColor};
                 }
                 </style>
@@ -420,7 +421,9 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
             </head>
             <body class="${
               chapterGeneralSettings.pageReader ? 'page-reader' : ''
-            }">
+            } ${
+        chapterGeneralSettings.pageReaderDisableAnimation ? 'no-animation' : ''
+      }">
               <div class="transition-chapter" style="transform: ${
                 isNextChapterScreenVisible
                   ? 'translateX(-100%)'
@@ -453,6 +456,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                       ': ' +
                       chapter.name.trim(),
                     noNextChapter: getString('readerScreen.noNextChapter'),
+                    removeText: getString('common.remove'),
+                    replaceText: getString('customCodeSettings.replace'),
                   },
                 })}
               </script>

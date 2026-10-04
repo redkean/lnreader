@@ -13,6 +13,8 @@ jest.mock('@modules/native-background-tasks', () => ({
     enqueue: jest.fn().mockResolvedValue('native-task-1'),
     fail: jest.fn(),
     getFailedTasks: jest.fn().mockResolvedValue([]),
+    getTask: jest.fn(),
+    getTasks: jest.fn().mockResolvedValue([]),
     remove: jest.fn().mockResolvedValue(undefined),
     removeFailed: jest.fn().mockResolvedValue(undefined),
     updateProgress: jest.fn().mockResolvedValue(undefined),
@@ -231,6 +233,38 @@ describe('BackgroundTaskQueue completion notifications', () => {
 
     resolvers.forEach(resolve => resolve());
     await Promise.all([firstRun, secondRun]);
+  });
+  it('hydrates active task payloads individually during refresh', async () => {
+    const summary = {
+      id: 'active-task',
+      type: 'LOCAL_RESTORE',
+      title: 'Restore',
+      state: 'queued',
+      attempt: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const activeTask = {
+      ...summary,
+      payload: JSON.stringify(task),
+      checkpoint: undefined,
+    };
+    jest.mocked(NativeBackgroundTasks.getTasks).mockResolvedValue([summary]);
+    jest
+      .mocked(NativeBackgroundTasks.getTask)
+      .mockResolvedValueOnce(activeTask);
+
+    const queue = new BackgroundTaskQueue();
+    await queue.refresh();
+
+    expect(NativeBackgroundTasks.getTask).toHaveBeenCalledWith('active-task');
+    expect(mockStoredTasks).toEqual([
+      expect.objectContaining({
+        id: 'active-task',
+        task,
+        state: 'queued',
+      }),
+    ]);
   });
 });
 

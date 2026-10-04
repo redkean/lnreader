@@ -818,7 +818,9 @@ export const getPrevChapter = async (
     .orderBy(
       desc(castInt(chapterSchema.page)),
       desc(castInt(chapterSchema.position)),
+      desc(chapterSchema.id),
     )
+    .limit(1)
     .get();
 };
 
@@ -847,7 +849,9 @@ export const getNextChapter = async (
     .orderBy(
       asc(castInt(chapterSchema.page)),
       asc(castInt(chapterSchema.position)),
+      asc(chapterSchema.id),
     )
+    .limit(1)
     .get();
 };
 
